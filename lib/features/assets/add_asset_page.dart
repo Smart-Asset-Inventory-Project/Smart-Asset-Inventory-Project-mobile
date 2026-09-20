@@ -86,7 +86,7 @@ class _AddAssetPageState extends State<AddAssetPage> {
             ),
             const SizedBox(height: 12),
             DropdownButtonFormField<String>(
-              value: _category,
+              initialValue: _category,
               decoration: const InputDecoration(
                   labelText: 'Category', border: OutlineInputBorder()),
               items: const ['computer', 'screen', 'furniture', 'printer', 'lab']
@@ -124,7 +124,7 @@ class _AddAssetPageState extends State<AddAssetPage> {
             ),
             const SizedBox(height: 12),
             DropdownButtonFormField<String>(
-              value: _condition,
+              initialValue: _condition,
               decoration: const InputDecoration(
                   labelText: 'Condition', border: OutlineInputBorder()),
               items: const ['good', 'needs_repair', 'damaged']
