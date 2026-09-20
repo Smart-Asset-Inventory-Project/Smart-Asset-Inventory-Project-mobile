@@ -58,7 +58,7 @@ class _DashboardStatsState extends State<DashboardStats> {
                 _card('Total Assets', d == null ? '…' : '${d.total}',
                     Icons.inventory_2_outlined),
                 _card('Asset Value', d == null ? '…' : '${d.value.toInt()}',
-                    Icons.attach_money),
+                    Icons.attach_money),//هو حاليًا إجمالي  تكلفة الشراء المسجل في قاعدة البيانات.
                 _card('Maintenance Due', d == null ? '…' : '${d.due}',
                     Icons.build_outlined),
                 _card('High Risk', d == null ? '…' : '${d.high}',
