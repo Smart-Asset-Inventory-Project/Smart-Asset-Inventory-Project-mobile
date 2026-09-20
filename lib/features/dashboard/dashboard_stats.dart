@@ -3,7 +3,7 @@ import '../../core/services/asset_service.dart';
 import '../../core/services/insights_service.dart';
 import '../../core/services/work_order_service.dart';
 
-/// AST-FR-08: إحصائيات حقيقية من السيرفس بدل الأرقام الثابتة.
+/// AST-FR-08: إحصائيات حقيقية من السيرفس بدل الأرقام الثابتة.sam
 /// Totals reconcile: نفس القوائم المستخدمة في الشاشات.
 class DashboardStats extends StatefulWidget {
   const DashboardStats({super.key});
