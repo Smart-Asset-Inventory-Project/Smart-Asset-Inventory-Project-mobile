@@ -6,7 +6,9 @@ import 'asset_detail_page.dart';
 
 /// AST-FR-01/02: بحث وعرض الأصول بكل مستوى + فلتر فئة.
 class AssetsListPage extends StatefulWidget {
-  const AssetsListPage({super.key});
+  final String? locationId;
+  final String? locationName;
+  const AssetsListPage({super.key, this.locationId, this.locationName});
 
   @override
   State<AssetsListPage> createState() => _AssetsListPageState();
@@ -21,16 +23,20 @@ class _AssetsListPageState extends State<AssetsListPage> {
   @override
   void initState() {
     super.initState();
-    _future = _service.fetchAssets();
+    _reload(initial: true);
   }
 
-  void _reload() {
-    setState(() {
-      _future = _service.fetchAssets(
-        query: _search.text.trim(),
-        category: _category == 'all' ? null : _category,
-      );
-    });
+  void _reload({bool initial = false}) {
+    final f = _service.fetchAssets(
+      query: _search.text.trim().isEmpty ? null : _search.text.trim(),
+      category: _category == 'all' ? null : _category,
+      locationId: widget.locationId,
+    );
+    if (initial) {
+      _future = f;
+    } else {
+      setState(() => _future = f);
+    }
   }
 
   @override
@@ -42,7 +48,10 @@ class _AssetsListPageState extends State<AssetsListPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Assets')),
+      appBar: AppBar(
+          title: Text(widget.locationName == null
+              ? 'Assets'
+              : 'Assets • ${widget.locationName}')),
       floatingActionButton: FloatingActionButton.extended(
         icon: const Icon(Icons.add),
         label: const Text('Add'),
@@ -77,21 +86,20 @@ class _AssetsListPageState extends State<AssetsListPage> {
               ),
             ),
           ),
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
+          // فلتر الفئة: Wrap يعرض كل الشيبس بدون سكرول أفقي
+          Padding(
             padding: const EdgeInsets.symmetric(horizontal: 12),
-            child: Row(
+            child: Wrap(
+              spacing: 8,
+              runSpacing: 4,
               children: ['all', 'computer', 'screen', 'furniture', 'printer', 'lab']
-                  .map((c) => Padding(
-                        padding: const EdgeInsets.only(right: 8),
-                        child: ChoiceChip(
-                          label: Text(c),
-                          selected: _category == c,
-                          onSelected: (_) {
-                            _category = c;
-                            _reload();
-                          },
-                        ),
+                  .map((c) => ChoiceChip(
+                        label: Text(c),
+                        selected: _category == c,
+                        onSelected: (_) {
+                          _category = c;
+                          _reload();
+                        },
                       ))
                   .toList(),
             ),

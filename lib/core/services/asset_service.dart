@@ -33,7 +33,8 @@ class AssetService {
     } on DioException catch (e) {
       if (e.type == DioExceptionType.connectionError ||
           e.type == DioExceptionType.connectionTimeout) {
-        return _mockAssets(query: query, category: category);
+        return _mockAssets(
+            query: query, category: category, locationId: locationId);
       }
       rethrow;
     }
@@ -89,7 +90,8 @@ class AssetService {
   }
 
   // Synthetic فقط - لا بيانات حقيقية. يغطي مبنيين وفئات متنوعة.
-  List<AssetModel> _mockAssets({String? query, String? category}) {
+  List<AssetModel> _mockAssets(
+      {String? query, String? category, String? locationId}) {
     const categories = ['computer', 'screen', 'furniture', 'printer', 'lab'];
     final list = List.generate(20, (i) {
       final b = i < 12 ? 'B1' : 'B2';
@@ -110,6 +112,15 @@ class AssetService {
       );
     });
     var out = list;
+    if (locationId != null && locationId.isNotEmpty) {
+      // المبنى/الدور يطابق كل ما تحته في الهرم mock.
+      final prefix = locationId == 'loc-b1' || locationId == 'campus-1'
+          ? 'loc-b1'
+          : locationId == 'loc-b2'
+              ? 'loc-b2'
+              : locationId;
+      out = out.where((a) => a.locationId.startsWith(prefix)).toList();
+    }
     if (category != null && category.isNotEmpty && category != 'all') {
       out = out.where((a) => a.category == category).toList();
     }

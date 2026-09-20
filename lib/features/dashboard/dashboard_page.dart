@@ -415,17 +415,36 @@
 
 import 'package:flutter/material.dart';
 import 'package:smart_asset_inventory/core/theme/app_colors.dart';
+import '../../core/services/auth_service.dart';
+import '../../models/user_model.dart';
+import '../auth/login_page.dart';
 
 import '../assets/assets_list_page.dart';
 import '../custody/transfers_page.dart';
+import '../locations/locations_page.dart';
+import '../maintenance/templates_page.dart';
 import '../maintenance/work_orders_page.dart';
 import '../risk/risk_queue_page.dart';
 import '../stocktake/stocktake_page.dart';
 import 'dashboard_risk_section.dart';
 import 'dashboard_stats.dart';
 
-class DashboardPage extends StatelessWidget {
+class DashboardPage extends StatefulWidget {
   const DashboardPage({super.key});
+
+  @override
+  State<DashboardPage> createState() => _DashboardPageState();
+}
+
+class _DashboardPageState extends State<DashboardPage> {
+  late Future<UserModel?> _userFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    // اسم المستخدم من الداتا المحفوظة بعد اللوجن (توكن/بروفايل الباك اند).
+    _userFuture = AuthService().currentUser();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -450,12 +469,19 @@ class DashboardPage extends StatelessWidget {
         child: ListView(
           padding: EdgeInsets.zero,
           children: [
-            const UserAccountsDrawerHeader(
-              accountName: Text('Ahmed Mohamed'),
-              accountEmail: Text('ahmed@example.com'),
-              currentAccountPicture: CircleAvatar(
-                child: Icon(Icons.person, size: 35),
-              ),
+            FutureBuilder<UserModel?>(
+              future: _userFuture,
+              builder: (context, snap) {
+                final name = snap.data?.name.trim();
+                return UserAccountsDrawerHeader(
+                  accountName:
+                      Text(name == null || name.isEmpty ? 'User' : name),
+                  accountEmail: Text(snap.data?.email ?? ''),
+                  currentAccountPicture: const CircleAvatar(
+                    child: Icon(Icons.person, size: 35),
+                  ),
+                );
+              },
             ),
 
             ListTile(
@@ -473,6 +499,17 @@ class DashboardPage extends StatelessWidget {
                 Navigator.push(
                   context,
                   MaterialPageRoute(builder: (_) => const AssetsListPage()),
+                );
+              },
+            ),
+
+            ListTile(
+              leading: const Icon(Icons.location_city_outlined),
+              title: const Text('Locations'),
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const LocationsPage()),
                 );
               },
             ),
@@ -500,6 +537,17 @@ class DashboardPage extends StatelessWidget {
             ),
 
             ListTile(
+              leading: const Icon(Icons.event_repeat_outlined),
+              title: const Text('Templates'),
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const TemplatesPage()),
+                );
+              },
+            ),
+
+            ListTile(
               leading: const Icon(Icons.settings_outlined),
               title: const Text('Settings'),
               onTap: () {},
@@ -507,11 +555,30 @@ class DashboardPage extends StatelessWidget {
 
             const Divider(),
 
+            // ListTile(
+            //   leading: const Icon(Icons.logout,color: AppColors.red,),
+            //   title: const Text('Logout',style: TextStyle(color: AppColors.red,),),
+            //   onTap: () {},
+            // ),
+
             ListTile(
-              leading: const Icon(Icons.logout),
-              title: const Text('Logout'),
-              onTap: () {},
+              leading: const Icon(Icons.logout,color: AppColors.red,),
+              title: const Text('Logout',style: TextStyle(
+                color: AppColors.red,
+              ),),
+              onTap: () async {
+                await AuthService().logout();
+                if (!context.mounted) return;
+                Navigator.pushAndRemoveUntil(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const LoginPage(),
+                  ),
+                      (route) => false,
+                );
+              },
             ),
+
           ],
         ),
       ),
@@ -525,10 +592,20 @@ class DashboardPage extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Welcome
-              const Text(
-                'Welcome back 👋',
-                style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+              // Welcome - اسم المستخدم من الداتا بعد اللوجن
+              FutureBuilder<UserModel?>(
+                future: _userFuture,
+                builder: (context, snap) {
+                  final name = snap.data?.name.trim();
+                  final title = (name == null || name.isEmpty)
+                      ? 'Welcome back 👋'
+                      : 'Welcome back, $name 👋';
+                  return Text(
+                    title,
+                    style: const TextStyle(
+                        fontSize: 24, fontWeight: FontWeight.bold),
+                  );
+                },
               ),
 
               const SizedBox(height: 6),

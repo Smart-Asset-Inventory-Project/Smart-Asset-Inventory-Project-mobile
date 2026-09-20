@@ -53,7 +53,8 @@ class _DashboardStatsState extends State<DashboardStats> {
               physics: const NeverScrollableScrollPhysics(),
               crossAxisSpacing: 12,
               mainAxisSpacing: 12,
-              childAspectRatio: 1.5,
+              // نسبة أقل = خلايا أطول حتى لا يفيض النص على الموبايل
+              childAspectRatio: 1.3,
               children: [
                 _card('Total Assets', d == null ? '…' : '${d.total}',
                     Icons.inventory_2_outlined),
@@ -65,12 +66,12 @@ class _DashboardStatsState extends State<DashboardStats> {
                     Icons.warning_amber_outlined),
               ],
             ),
-            const SizedBox(height: 12),
-            if (d != null)
-              Text(
-                'High ${d.high} • Med ${d.med} • Low ${d.low} (tap card for reasons)',
-                style: const TextStyle(color: Colors.grey, fontSize: 12),
-              ),
+            // const SizedBox(height: 12),
+            // if (d != null)
+            //   Text(
+            //     'High ${d.high} • Med ${d.med} • Low ${d.low} (tap card for reasons)',
+            //     style: const TextStyle(color: Colors.grey, fontSize: 12),
+            //   ),
           ],
         );
       },
@@ -80,17 +81,22 @@ class _DashboardStatsState extends State<DashboardStats> {
   Widget _card(String title, String value, IconData icon) {
     return Card(
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(12),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Icon(icon, size: 28, color: Colors.blue),
-            Text(value,
-                style:
-                    const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+            Icon(icon, size: 24, color: Colors.blue),
+            // FittedBox يمنع RenderFlex overflow مع تكبير خط الجهاز
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: Text(value,
+                  style: const TextStyle(
+                      fontSize: 20, fontWeight: FontWeight.bold)),
+            ),
             Text(title,
-                style: const TextStyle(fontSize: 13, color: Colors.grey)),
+                style: const TextStyle(fontSize: 12, color: Colors.grey)),
           ],
         ),
       ),
