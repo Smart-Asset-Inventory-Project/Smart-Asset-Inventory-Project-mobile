@@ -64,3 +64,11 @@ class AssetModel {
         purchaseDate: json['purchaseDate']?.toString(),
       );
 }
+/*
+* AST: add login screen with auth service
+AST: add dashboard screen with live stats
+AST: add assets list and asset detail screens
+AST: add custody transfers screens
+AST: add work orders screens
+AST: add stocktake QR scan and risk queue screens
+AST: add procurement docs and retirement screens*/
