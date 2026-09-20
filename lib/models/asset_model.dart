@@ -65,6 +65,7 @@ class AssetModel {
       );
 }
 /*
+
 * AST: add login screen with auth service
 AST: add dashboard screen with live stats
 AST: add assets list and asset detail screens
