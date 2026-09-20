@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../core/services/asset_service.dart';
 import '../../models/asset_model.dart';
+import 'add_asset_page.dart';
 import 'asset_detail_page.dart';
 
 /// AST-FR-01/02: بحث وعرض الأصول بكل مستوى + فلتر فئة.
@@ -42,6 +43,17 @@ class _AssetsListPageState extends State<AssetsListPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Assets')),
+      floatingActionButton: FloatingActionButton.extended(
+        icon: const Icon(Icons.add),
+        label: const Text('Add'),
+        onPressed: () async {
+          final ok = await Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const AddAssetPage()),
+          );
+          if (ok == true) _reload();
+        },
+      ),
       body: Column(
         children: [
           Padding(

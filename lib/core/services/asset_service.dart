@@ -54,6 +54,40 @@ class AssetService {
     }
   }
 
+  /// AST-FR-02: إنشاء أصل. يرمي رسالة واضحة لو Tag/Serial مكرر (409).
+  Future<AssetModel> createAsset(Map<String, dynamic> payload) async {
+    try {
+      final res = await _api.post(AppConstants.assetsEndpoint, data: payload);
+      final data = res.data is Map ? res.data['data'] ?? res.data : {};
+      return AssetModel.fromJson(Map<String, dynamic>.from(data as Map));
+    } on DioException catch (e) {
+      if (e.response?.statusCode == 409) {
+        final msg =
+            e.response?.data?['message']?.toString() ?? 'Duplicate tag/serial';
+        throw Exception(msg);
+      }
+      if (e.type == DioExceptionType.connectionError ||
+          e.type == DioExceptionType.connectionTimeout) {
+        // mock accept محلي حتى يجهز الباك اند
+        return AssetModel.fromJson({
+          'id': 'mock-${DateTime.now().millisecondsSinceEpoch}',
+          'tag': payload['tag'],
+          'serial': payload['serial'],
+          'category': payload['category'],
+          'brand': payload['brand'],
+          'model': payload['model'],
+          'locationId': payload['locationId'],
+          'condition': payload['condition'] ?? 'good',
+          'status': 'active',
+          'purchaseCost': payload['purchaseCost'],
+          'purchaseDate': payload['purchaseDate'],
+        });
+      }
+      final msg = e.response?.data?['message']?.toString() ?? 'Create failed';
+      throw Exception(msg);
+    }
+  }
+
   // Synthetic فقط - لا بيانات حقيقية. يغطي مبنيين وفئات متنوعة.
   List<AssetModel> _mockAssets({String? query, String? category}) {
     const categories = ['computer', 'screen', 'furniture', 'printer', 'lab'];
