@@ -1,0 +1,481 @@
+// import 'package:flutter/material.dart';
+//
+// class LoginPage extends StatefulWidget {
+//   const LoginPage({super.key});
+//
+//   @override
+//   State<LoginPage> createState() => _LoginPageState();
+// }
+//
+// class _LoginPageState extends State<LoginPage> {
+//   bool isAdmin = false;
+//   bool obscurePassword = true;
+//
+//   final emailController = TextEditingController();
+//   final passwordController = TextEditingController();
+//
+//   @override
+//   void dispose() {
+//     emailController.dispose();
+//     passwordController.dispose();
+//     super.dispose();
+//   }
+//
+//   void login() {
+//     final email = emailController.text.trim();
+//     final password = passwordController.text.trim();
+//
+//     final selectedRole = isAdmin ? 'admin' : 'user';
+//
+//     debugPrint('Email: $email');
+//     debugPrint('Password: $password');
+//     debugPrint('Selected Role: $selectedRole');
+//
+//     // Later:
+//     // Send email + password to Backend
+//     // Backend returns the real user role.
+//   }
+//
+//   @override
+//   Widget build(BuildContext context) {
+//     return Scaffold(
+//       body: SafeArea(
+//         child: Center(
+//           child: SingleChildScrollView(
+//             padding: const EdgeInsets.symmetric(horizontal: 24),
+//             child: Column(
+//               crossAxisAlignment: CrossAxisAlignment.stretch,
+//               children: [
+//
+//                 // Logo
+//                 Center(
+//                   child: Container(
+//                     width: 120,
+//                     height: 120,
+//                     decoration: BoxDecoration(
+//                       color: Colors.blue.shade50,
+//                       //shape: BoxShape.circle,
+//                       borderRadius: BorderRadius.circular(20),
+//                     ),
+//                     child: const Icon(
+//                       Icons.inventory_2_outlined,
+//                       size: 42,
+//                       color: Colors.blue,
+//                     ),
+//                   ),
+//                 ),
+//
+//                 const SizedBox(height: 44),
+//
+//                 // App name
+//                 const Text(
+//                   'Smart Asset Inventory',
+//                   textAlign: TextAlign.center,
+//                   style: TextStyle(
+//                     fontSize: 25,
+//                     fontWeight: FontWeight.bold,
+//                   ),
+//                 ),
+//
+//                 const SizedBox(height: 8),
+//
+//                 const Text(
+//                   'Manage Assets Smarter',
+//                   textAlign: TextAlign.center,
+//                   style: TextStyle(
+//                     fontSize: 14,
+//                     color: Colors.grey,
+//                   ),
+//                 ),
+//
+//
+//                 // Role selection
+//
+//
+//
+//                 const SizedBox(height: 18),
+//
+//                 // Email
+//                 const Text(
+//                   'Email',
+//                   style: TextStyle(
+//                     fontSize: 15,
+//                     fontWeight: FontWeight.w600,
+//                   ),
+//                 ),
+//
+//                 const SizedBox(height: 8),
+//
+//                 TextField(
+//                   controller: emailController,
+//                   keyboardType: TextInputType.emailAddress,
+//                   decoration: InputDecoration(
+//                     hintText: 'Enter your email',
+//                     prefixIcon: const Icon(Icons.email_outlined),
+//                     border: OutlineInputBorder(
+//                       borderRadius: BorderRadius.circular(12),
+//                     ),
+//                   ),
+//                 ),
+//
+//                 const SizedBox(height: 20),
+//
+//                 // Password
+//                 const Text(
+//                   'Password',
+//                   style: TextStyle(
+//                     fontSize: 15,
+//                     fontWeight: FontWeight.w600,
+//                   ),
+//                 ),
+//
+//                 const SizedBox(height: 8),
+//
+//                 TextField(
+//                   controller: passwordController,
+//                   obscureText: obscurePassword,
+//                   decoration: InputDecoration(
+//                     hintText: 'Enter your password',
+//                     prefixIcon: const Icon(Icons.lock_outline),
+//                     suffixIcon: IconButton(
+//                       onPressed: () {
+//                         setState(() {
+//                           obscurePassword = !obscurePassword;
+//                         });
+//                       },
+//                       icon: Icon(
+//                         obscurePassword
+//                             ? Icons.visibility_outlined
+//                             : Icons.visibility_off_outlined,
+//                       ),
+//                     ),
+//                     border: OutlineInputBorder(
+//                       borderRadius: BorderRadius.circular(12),
+//                     ),
+//                   ),
+//                 ),
+//
+//                 const SizedBox(height: 30),
+//
+//                 // Login button
+//                 SizedBox(
+//                   height: 52,
+//                   child: ElevatedButton(
+//                     onPressed: login,
+//                     child: const Text(
+//                       'Login',
+//                       style: TextStyle(
+//                         fontSize: 16,
+//                         fontWeight: FontWeight.bold,
+//                       ),
+//                     ),
+//                   ),
+//                 ),
+//               ],
+//             ),
+//           ),
+//         ),
+//       ),
+//     );
+//   }
+// }
+//
+//
+//
+//
+//
+//
+//
+//
+//
+// class _RoleCard extends StatelessWidget {
+//   final String title;
+//   final IconData icon;
+//   final bool isSelected;
+//   final VoidCallback onTap;
+//
+//   const _RoleCard({
+//     required this.title,
+//     required this.icon,
+//     required this.isSelected,
+//     required this.onTap,
+//   });
+//
+//   @override
+//   Widget build(BuildContext context) {
+//     return InkWell(
+//       onTap: onTap,
+//       borderRadius: BorderRadius.circular(12),
+//       child: Container(
+//         padding: const EdgeInsets.symmetric(vertical: 16),
+//         decoration: BoxDecoration(
+//           borderRadius: BorderRadius.circular(12),
+//           border: Border.all(
+//             color: isSelected
+//                 ? Colors.blue
+//                 : Colors.grey.shade300,
+//             width: isSelected ? 2 : 1,
+//           ),
+//           color: isSelected
+//               ? Colors.blue.shade50
+//               : Colors.white,
+//         ),
+//         child: Column(
+//           children: [
+//             Icon(
+//               icon,
+//               size: 28,
+//               color: isSelected
+//                   ? Colors.blue
+//                   : Colors.grey,
+//             ),
+//
+//             const SizedBox(height: 8),
+//
+//             Text(
+//               title,
+//               style: TextStyle(
+//                 fontWeight: FontWeight.w600,
+//                 color: isSelected
+//                     ? Colors.blue
+//                     : Colors.grey.shade700,
+//               ),
+//             ),
+//           ],
+//         ),
+//       ),
+//     );
+//   }
+// }
+
+import 'package:flutter/material.dart';
+
+import '../../core/services/auth_service.dart';
+import '../dashboard/dashboard_page.dart';
+
+class LoginPage extends StatefulWidget {
+  const LoginPage({super.key});
+
+  @override
+  State<LoginPage> createState() => _LoginPageState();
+}
+
+class _LoginPageState extends State<LoginPage> {
+  bool isAdmin = false;
+  bool obscurePassword = true;
+  bool _loading = false;
+
+  final emailController = TextEditingController();
+  final passwordController = TextEditingController();
+  final _auth = AuthService();
+
+  final _formKey = GlobalKey<FormState>();
+
+  @override
+  void dispose() {
+    emailController.dispose();
+    passwordController.dispose();
+    super.dispose();
+  }
+
+  void login() async {
+    // Validate all form fields first
+    if (!_formKey.currentState!.validate()) {
+      return;
+    }
+
+    final email = emailController.text.trim();
+    final password = passwordController.text.trim();
+
+    setState(() => _loading = true);
+    try {
+      await _auth.login(email: email, password: password);
+      if (!mounted) return;
+      // AST Auth: الدور الحقيقي يأتي من الباك اند داخل التوكن/اليوزر.
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (context) => const DashboardPage()),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))),
+      );
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: SafeArea(
+        child: Center(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(horizontal: 24),
+            child: Form(
+              key: _formKey,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  // Logo
+                  Center(
+                    child: Container(
+                      width: 120,
+                      height: 120,
+                      decoration: BoxDecoration(
+                        color: Colors.blue.shade50,
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: const Icon(
+                        Icons.inventory_2_outlined,
+                        size: 42,
+                        color: Colors.blue,
+                      ),
+                    ),
+                  ),
+
+                  const SizedBox(height: 44),
+
+                  // App name
+                  const Text(
+                    'Smart Asset Inventory',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(fontSize: 25, fontWeight: FontWeight.bold),
+                  ),
+
+                  const SizedBox(height: 8),
+
+                  // App description
+                  const Text(
+                    'Manage Assets Smarter',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(fontSize: 14, color: Colors.grey),
+                  ),
+
+                  const SizedBox(height: 18),
+
+                  // Email label
+                  const Text(
+                    'Email',
+                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+                  ),
+
+                  const SizedBox(height: 8),
+
+                  // Email field
+                  TextFormField(
+                    controller: emailController,
+                    keyboardType: TextInputType.emailAddress,
+
+                    validator: (value) {
+                      // Check if email is empty
+                      if (value == null || value.trim().isEmpty) {
+                        return 'Please enter your email';
+                      }
+
+                      // Check email format
+                      final emailRegex = RegExp(
+                        r'^[\w-\.]+@([\w-]+\.)+(com|net|org|edu|gov)$',
+                      );
+
+                      if (!emailRegex.hasMatch(value.trim())) {
+                        return 'Please enter a valid email';
+                      }
+
+                      return null;
+                    },
+
+                    decoration: InputDecoration(
+                      hintText: 'Enter your email',
+                      prefixIcon: const Icon(Icons.email_outlined),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                  ),
+
+                  const SizedBox(height: 20),
+
+                  // Password label
+                  const Text(
+                    'Password',
+                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+                  ),
+
+                  const SizedBox(height: 8),
+
+                  // Password field
+                  TextFormField(
+                    controller: passwordController,
+                    obscureText: obscurePassword,
+
+                    validator: (value) {
+                      // Check if password is empty
+                      if (value == null || value.trim().isEmpty) {
+                        return 'Please enter your password';
+                      }
+
+                      // Check password length
+                      if (value.length < 6) {
+                        return 'Password must be at least 6 characters';
+                      }
+
+                      return null;
+                    },
+
+                    decoration: InputDecoration(
+                      hintText: 'Enter your password',
+                      prefixIcon: const Icon(Icons.lock_outline),
+
+                      // Show / Hide password
+                      suffixIcon: IconButton(
+                        onPressed: () {
+                          setState(() {
+                            obscurePassword = !obscurePassword;
+                          });
+                        },
+                        icon: Icon(
+                          obscurePassword
+                              ? Icons.visibility_outlined
+                              : Icons.visibility_off_outlined,
+                        ),
+                      ),
+
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                  ),
+
+                  const SizedBox(height: 30),
+
+                  // Login button
+                  SizedBox(
+                    height: 52,
+                    child: ElevatedButton(
+                      onPressed: _loading ? null : login,
+                      child: _loading
+                          ? const SizedBox(
+                              width: 22,
+                              height: 22,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Text(
+                              'Login',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
