@@ -14,4 +14,9 @@ class AppConstants {
 
   static const String tokenKey = 'ast_auth_token';
   static const String userKey = 'ast_auth_user';
+
+  /// Backend-ready switch: true = شغل بدون سيرفر ببيانات synthetic.
+/// يوم الباك اند: خليها false وغير baseUrl فقط، وكل السيرفس
+/// ستتكلم مع السيرفر الحقيقي بدون أي تعديل آخر.
+  static const bool allowMockFallback = true;
 }

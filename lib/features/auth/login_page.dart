@@ -250,6 +250,8 @@
 
 import 'package:flutter/material.dart';
 
+import '../../core/l10n/strings.dart';
+import '../../core/theme/app_settings.dart';
 import '../../core/services/auth_service.dart';
 import '../dashboard/dashboard_page.dart';
 
@@ -310,170 +312,194 @@ class _LoginPageState extends State<LoginPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       body: SafeArea(
-        child: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 24),
-            child: Form(
-              key: _formKey,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  // Logo
-                  Center(
-                    child: Container(
-                      width: 120,
-                      height: 120,
-                      decoration: BoxDecoration(
-                        color: Colors.blue.shade50,
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: const Icon(
-                        Icons.inventory_2_outlined,
-                        size: 42,
-                        color: Colors.blue,
-                      ),
+        child: Stack(
+          children: [
+            // Top settings controls
+            Positioned(
+              top: 8,
+              right: 16,
+              left: 16,
+              child: AnimatedBuilder(
+                animation: appSettings,
+                builder: (context, _) => Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    TextButton(
+                      onPressed: () => appSettings.toggleLocale(),
+                      child: Text(appSettings.isArabic ? 'EN' : 'عربي'),
                     ),
-                  ),
-
-                  const SizedBox(height: 44),
-
-                  // App name
-                  const Text(
-                    'Smart Asset Inventory',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(fontSize: 25, fontWeight: FontWeight.bold),
-                  ),
-
-                  const SizedBox(height: 8),
-
-                  // App description
-                  const Text(
-                    'Manage Assets Smarter',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(fontSize: 14, color: Colors.grey),
-                  ),
-
-                  const SizedBox(height: 18),
-
-                  // Email label
-                  const Text(
-                    'Email',
-                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
-                  ),
-
-                  const SizedBox(height: 8),
-
-                  // Email field
-                  TextFormField(
-                    controller: emailController,
-                    keyboardType: TextInputType.emailAddress,
-
-                    validator: (value) {
-                      // Check if email is empty
-                      if (value == null || value.trim().isEmpty) {
-                        return 'Please enter your email';
-                      }
-
-                      // Check email format
-                      final emailRegex = RegExp(
-                        r'^[\w-\.]+@([\w-]+\.)+(com|net|org|edu|gov)$',
-                      );
-
-                      if (!emailRegex.hasMatch(value.trim())) {
-                        return 'Please enter a valid email';
-                      }
-
-                      return null;
-                    },
-
-                    decoration: InputDecoration(
-                      hintText: 'Enter your email',
-                      prefixIcon: const Icon(Icons.email_outlined),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
+                    IconButton(
+                      tooltip: tr(context, 'darkMode'),
+                      onPressed: () => appSettings.toggleTheme(),
+                      icon: Icon(appSettings.isDark
+                          ? Icons.light_mode_outlined
+                          : Icons.dark_mode_outlined),
                     ),
-                  ),
-
-                  const SizedBox(height: 20),
-
-                  // Password label
-                  const Text(
-                    'Password',
-                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
-                  ),
-
-                  const SizedBox(height: 8),
-
-                  // Password field
-                  TextFormField(
-                    controller: passwordController,
-                    obscureText: obscurePassword,
-
-                    validator: (value) {
-                      // Check if password is empty
-                      if (value == null || value.trim().isEmpty) {
-                        return 'Please enter your password';
-                      }
-
-                      // Check password length
-                      if (value.length < 6) {
-                        return 'Password must be at least 6 characters';
-                      }
-
-                      return null;
-                    },
-
-                    decoration: InputDecoration(
-                      hintText: 'Enter your password',
-                      prefixIcon: const Icon(Icons.lock_outline),
-
-                      // Show / Hide password
-                      suffixIcon: IconButton(
-                        onPressed: () {
-                          setState(() {
-                            obscurePassword = !obscurePassword;
-                          });
-                        },
-                        icon: Icon(
-                          obscurePassword
-                              ? Icons.visibility_outlined
-                              : Icons.visibility_off_outlined,
+                  ],
+                ),
+              ),
+            ),
+            Center(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.symmetric(horizontal: 24),
+                child: Form(
+                  key: _formKey,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      const SizedBox(height: 40),
+                      // Logo
+                      Center(
+                        child: Container(
+                          width: 120,
+                          height: 120,
+                          decoration: BoxDecoration(
+                            color: Colors.blue.shade50,
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: const Icon(
+                            Icons.inventory_2_outlined,
+                            size: 42,
+                            color: Colors.blue,
+                          ),
                         ),
                       ),
 
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
+                      const SizedBox(height: 44),
+
+                      // App name
+                      Text(
+                        tr(context, 'appName'),
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                            fontSize: 25, fontWeight: FontWeight.bold),
                       ),
-                    ),
-                  ),
 
-                  const SizedBox(height: 30),
+                      const SizedBox(height: 8),
 
-                  // Login button
-                  SizedBox(
-                    height: 52,
-                    child: ElevatedButton(
-                      onPressed: _loading ? null : login,
-                      child: _loading
-                          ? const SizedBox(
-                              width: 22,
-                              height: 22,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : const Text(
-                              'Login',
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                              ),
+                      // App description
+                      Text(
+                        tr(context, 'tagline'),
+                        textAlign: TextAlign.center,
+                        style:
+                            const TextStyle(fontSize: 14, color: Colors.grey),
+                      ),
+
+                      const SizedBox(height: 18),
+
+                      // Email label
+                      Text(
+                        tr(context, 'email'),
+                        style: const TextStyle(
+                            fontSize: 15, fontWeight: FontWeight.w600),
+                      ),
+
+                      const SizedBox(height: 8),
+
+                      // Email field
+                      TextFormField(
+                        controller: emailController,
+                        keyboardType: TextInputType.emailAddress,
+
+                        validator: (value) {
+                          if (value == null || value.trim().isEmpty) {
+                            return tr(context, 'enterEmail');
+                          }
+                          final emailRegex = RegExp(
+                            r'^[\w-\.]+@([\w-]+\.)+(com|net|org|edu|gov)$',
+                          );
+                          if (!emailRegex.hasMatch(value.trim())) {
+                            return tr(context, 'invalidEmail');
+                          }
+                          return null;
+                        },
+
+                        decoration: InputDecoration(
+                          hintText: tr(context, 'enterEmail'),
+                          prefixIcon: const Icon(Icons.email_outlined),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                      ),
+
+                      const SizedBox(height: 20),
+
+                      // Password label
+                      Text(
+                        tr(context, 'password'),
+                        style: const TextStyle(
+                            fontSize: 15, fontWeight: FontWeight.w600),
+                      ),
+
+                      const SizedBox(height: 8),
+
+                      // Password field
+                      TextFormField(
+                        controller: passwordController,
+                        obscureText: obscurePassword,
+
+                        validator: (value) {
+                          if (value == null || value.trim().isEmpty) {
+                            return tr(context, 'enterPassword');
+                          }
+                          if (value.length < 6) {
+                            return tr(context, 'shortPassword');
+                          }
+                          return null;
+                        },
+
+                        decoration: InputDecoration(
+                          hintText: tr(context, 'enterPassword'),
+                          prefixIcon: const Icon(Icons.lock_outline),
+
+                          suffixIcon: IconButton(
+                            onPressed: () {
+                              setState(() {
+                                obscurePassword = !obscurePassword;
+                              });
+                            },
+                            icon: Icon(
+                              obscurePassword
+                                  ? Icons.visibility_outlined
+                                  : Icons.visibility_off_outlined,
                             ),
-                    ),
+                          ),
+
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                      ),
+
+                      const SizedBox(height: 30),
+
+                      // Login button
+                      SizedBox(
+                        height: 52,
+                        child: ElevatedButton(
+                          onPressed: _loading ? null : login,
+                          child: _loading
+                              ? const SizedBox(
+                                  width: 22,
+                                  height: 22,
+                                  child: CircularProgressIndicator(strokeWidth: 2),
+                                )
+                              : Text(
+                                  tr(context, 'login'),
+                                  style: const TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                        ),
+                      ),
+                    ],
                   ),
-                ],
+                ),
               ),
             ),
-          ),
+          ],
         ),
       ),
     );

@@ -20,8 +20,7 @@ class InsightsService {
               RiskItemModel.fromJson(Map<String, dynamic>.from(e as Map)))
           .toList();
     } on DioException catch (e) {
-      if (e.type == DioExceptionType.connectionError ||
-          e.type == DioExceptionType.connectionTimeout) {
+      if (AppConstants.allowMockFallback && e.response == null) {
         return const [
           RiskItemModel(
             assetId: 'mock-6',

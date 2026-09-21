@@ -22,8 +22,7 @@ class RetirementService {
         },
       );
     } on DioException catch (e) {
-      if (e.type == DioExceptionType.connectionError ||
-          e.type == DioExceptionType.connectionTimeout) {
+      if (AppConstants.allowMockFallback && e.response == null) {
         return; // mock accept
       }
       final msg = e.response?.data?['message']?.toString() ?? 'Retire failed';

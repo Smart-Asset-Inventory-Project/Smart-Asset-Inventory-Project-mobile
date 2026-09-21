@@ -20,8 +20,7 @@ class WorkOrderService {
               WorkOrderModel.fromJson(Map<String, dynamic>.from(e as Map)))
           .toList();
     } on DioException catch (e) {
-      if (e.type == DioExceptionType.connectionError ||
-          e.type == DioExceptionType.connectionTimeout) {
+      if (AppConstants.allowMockFallback && e.response == null) {
         return _mock(status);
       }
       rethrow;
@@ -45,8 +44,7 @@ class WorkOrderService {
         },
       );
     } on DioException catch (e) {
-      if (e.type == DioExceptionType.connectionError ||
-          e.type == DioExceptionType.connectionTimeout) {
+      if (AppConstants.allowMockFallback && e.response == null) {
         return; // mock accept
       }
       rethrow;

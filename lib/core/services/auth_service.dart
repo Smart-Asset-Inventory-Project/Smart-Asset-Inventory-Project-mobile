@@ -41,10 +41,10 @@ class AuthService {
           key: AppConstants.userKey, value: jsonEncode(user.toJson()));
       return user;
     } on DioException catch (e) {
-      // Fallback محلي للتجربة بدون باك اند. احذفه قبل التسليم النهائي
-      // أو اتركه خلف kDebugMode فقط.
-      if (e.type == DioExceptionType.connectionError ||
-          e.type == DioExceptionType.connectionTimeout) {
+      // Fallback محلي للتجربة بدون باك اند (أي خطأ بدون رد سيرفر).
+      // احذفه قبل التسليم النهائي أو اتركه خلف kDebugMode فقط.
+      // رد حقيقي (401 بيانات غلط) يظهر كخطأ ولا يدخل mock.
+      if (AppConstants.allowMockFallback && e.response == null) {
         final mock = UserModel.mock(email);
         await _storage.write(key: AppConstants.tokenKey, value: 'mock-token');
         await _storage.write(

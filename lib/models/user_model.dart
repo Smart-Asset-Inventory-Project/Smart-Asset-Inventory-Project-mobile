@@ -34,10 +34,43 @@ class UserModel {
       };
 
   /// مستخدم تجريبي عند غياب الباك اند فقط.
-  factory UserModel.mock(String email) => UserModel(
-        id: 'mock-1',
-        name: 'Mock User',
+  /// id يطابق عهدة mock حتى تعرض داشبورد الـ custodian بيانات.
+  factory UserModel.mock(String email) {
+    final lower = email.toLowerCase();
+    if (lower.contains('admin')) {
+      return UserModel(
+        id: 'user-admin',
+        name: 'Asset Administrator',
         email: email,
-        role: UserRole.custodian,
+        role: UserRole.admin,
       );
+    } else if (lower.contains('procure') || lower.contains('finance')) {
+      return UserModel(
+        id: 'user-procure',
+        name: 'Procurement Viewer',
+        email: email,
+        role: UserRole.procurement,
+      );
+    } else if (lower.contains('tech')) {
+      return UserModel(
+        id: 'user-tech',
+        name: 'Maintenance Technician',
+        email: email,
+        role: UserRole.technician,
+      );
+    } else if (lower.contains('audit')) {
+      return UserModel(
+        id: 'user-audit',
+        name: 'Auditor Inspector',
+        email: email,
+        role: UserRole.auditor,
+      );
+    }
+    return UserModel(
+      id: 'user-1',
+      name: 'Mock Custodian',
+      email: email,
+      role: UserRole.custodian,
+    );
+  }
 }

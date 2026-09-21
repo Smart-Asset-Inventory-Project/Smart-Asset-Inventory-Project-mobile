@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import '../../core/l10n/strings.dart';
 import '../../core/services/work_order_service.dart';
+import '../../core/theme/app_colors.dart';
 import '../../models/work_order_model.dart';
 import 'work_order_detail_page.dart';
 
@@ -31,7 +33,7 @@ class _WorkOrdersPageState extends State<WorkOrdersPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Work Orders')),
+      appBar: AppBar(title: Text(tr(context, 'workOrders'))),
       body: Column(
         children: [
           SingleChildScrollView(
@@ -42,7 +44,7 @@ class _WorkOrdersPageState extends State<WorkOrdersPage> {
                   .map((s) => Padding(
                         padding: const EdgeInsets.only(right: 8),
                         child: ChoiceChip(
-                          label: Text(s),
+                          label: Text(tr(context, s)),
                           selected: _status == s,
                           onSelected: (_) {
                             _status = s;
@@ -61,42 +63,84 @@ class _WorkOrdersPageState extends State<WorkOrdersPage> {
                   return const Center(child: CircularProgressIndicator());
                 }
                 if (snap.hasError) {
-                  return Center(child: Text('Error: ${snap.error}'));
+                  return Center(
+                    child: Text('${tr(context, 'failedRisk')}: ${snap.error}'),
+                  );
                 }
                 final items = snap.data ?? [];
                 if (items.isEmpty) {
-                  return const Center(child: Text('No work orders'));
+                  return Center(child: Text(tr(context, 'noWorkOrders')));
                 }
                 return ListView.separated(
+                  padding: const EdgeInsets.only(bottom: 24),
                   itemCount: items.length,
-                  separatorBuilder: (_, __) => const Divider(height: 1),
+                  separatorBuilder: (_, __) => const SizedBox(height: 8),
                   itemBuilder: (context, i) {
                     final w = items[i];
-                    return ListTile(
-                      leading: Icon(
-                        w.status == 'closed'
-                            ? Icons.check_circle
-                            : Icons.build_outlined,
-                        color: w.priority == 'high'
-                            ? Colors.red
-                            : Colors.blue,
+                    final pColor = w.priority == 'high'
+                        ? AppColors.red
+                        : w.priority == 'medium'
+                            ? AppColors.orange
+                            : AppColors.blue;
+                    final sColor = w.status == 'closed'
+                        ? AppColors.green
+                        : w.status == 'open'
+                            ? AppColors.red
+                            : AppColors.orange;
+
+                    return Card(
+                      margin: const EdgeInsets.symmetric(horizontal: 12),
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        side: BorderSide(color: Colors.grey.shade200),
                       ),
-                      title: Text('${w.id} • ${w.assetId}',
-                          style:
-                              const TextStyle(fontWeight: FontWeight.bold)),
-                      subtitle: Text(
-                          '${w.priority} • ${w.status} • ${w.scheduledDate ?? '-'}'),
-                      trailing: const Icon(Icons.chevron_right),
-                      onTap: () async {
-                        final changed = await Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) =>
-                                WorkOrderDetailPage(workOrder: w),
+                      child: ListTile(
+                        leading: Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: pColor.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(10),
                           ),
-                        );
-                        if (changed == true) _reload();
-                      },
+                          child: Icon(
+                            w.status == 'closed'
+                                ? Icons.check_circle_outline
+                                : Icons.build_outlined,
+                            color: pColor,
+                          ),
+                        ),
+                        title: Text('${w.id} • ${w.assetId}',
+                            style:
+                                const TextStyle(fontWeight: FontWeight.bold)),
+                        subtitle: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const SizedBox(height: 4),
+                            Text(
+                                '${tr(context, 'scheduled')}: ${w.scheduledDate ?? '-'}',
+                                style: const TextStyle(fontSize: 12)),
+                            const SizedBox(height: 6),
+                            Row(
+                              children: [
+                                _badge(tr(context, w.priority), pColor),
+                                const SizedBox(width: 6),
+                                _badge(tr(context, w.status), sColor),
+                              ],
+                            ),
+                          ],
+                        ),
+                        trailing:
+                            const Icon(Icons.chevron_right_outlined, size: 20),
+                        onTap: () async {
+                          final changed = await Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => WorkOrderDetailPage(workOrder: w),
+                            ),
+                          );
+                          if (changed == true) _reload();
+                        },
+                      ),
                     );
                   },
                 );
@@ -104,6 +148,21 @@ class _WorkOrdersPageState extends State<WorkOrdersPage> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _badge(String text, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Text(
+        text,
+        style: TextStyle(
+            color: color, fontSize: 11, fontWeight: FontWeight.bold),
       ),
     );
   }

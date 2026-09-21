@@ -19,8 +19,7 @@ class DocumentService {
       if (e.response?.statusCode == 403) {
         throw Exception('Access denied: procurement permission required');
       }
-      if (e.type == DioExceptionType.connectionError ||
-          e.type == DioExceptionType.connectionTimeout) {
+      if (AppConstants.allowMockFallback && e.response == null) {
         return '${AppConstants.baseUrl}/mock-docs/$filename';
       }
       rethrow;

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../core/l10n/strings.dart';
 import '../../core/services/template_service.dart';
 import '../../models/maintenance_template_model.dart';
 
@@ -30,10 +31,26 @@ class _TemplatesPageState extends State<TemplatesPage> {
     }
   }
 
+  String _triggerText(BuildContext context, MaintenanceTemplate t) {
+    final isAr = Localizations.localeOf(context).languageCode == 'ar';
+    switch (t.triggerType) {
+      case 'calendar':
+        return isAr
+            ? 'كل ${t.intervalDays ?? '-'} يوم'
+            : 'Every ${t.intervalDays ?? '-'} days';
+      case 'runtime':
+        return isAr
+            ? 'كل ${t.runtimeHours ?? '-'} ساعة تشغيل'
+            : 'Every ${t.runtimeHours ?? '-'} hrs';
+      default:
+        return tr(context, t.conditionRule ?? 'condition');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Maintenance Templates')),
+      appBar: AppBar(title: Text(tr(context, 'templates'))),
       body: FutureBuilder<List<MaintenanceTemplate>>(
         future: _future,
         builder: (context, snap) {
@@ -41,11 +58,12 @@ class _TemplatesPageState extends State<TemplatesPage> {
             return const Center(child: CircularProgressIndicator());
           }
           if (snap.hasError) {
-            return Center(child: Text('Error: ${snap.error}'));
+            return Center(
+                child: Text('${tr(context, 'error')}: ${snap.error}'));
           }
           final items = snap.data ?? [];
           if (items.isEmpty) {
-            return const Center(child: Text('No templates'));
+            return Center(child: Text(tr(context, 'noTemplates')));
           }
           return ListView.separated(
             padding: const EdgeInsets.all(12),
@@ -58,18 +76,18 @@ class _TemplatesPageState extends State<TemplatesPage> {
                 child: ExpansionTile(
                   leading: Icon(Icons.event_repeat_outlined,
                       color: _badge(t.triggerType)),
-                  title: Text(t.name,
+                  title: Text(tr(context, t.name),
                       style: const TextStyle(fontWeight: FontWeight.bold)),
                   subtitle: Text(
-                    '${t.category} • ${t.triggerLabel}'
-                    '${due == null ? '' : '\nNext due: ${due.toIso8601String().substring(0, 10)}'}',
+                    '${tr(context, t.category)} • ${_triggerText(context, t)}'
+                    '${due == null ? '' : '\n${tr(context, 'nextDue')}: ${due.toIso8601String().substring(0, 10)}'}',
                   ),
                   children: t.checklist
                       .map((c) => ListTile(
                             dense: true,
-                            leading: const Icon(Icons.check_box_outlined,
-                                size: 20),
-                            title: Text(c),
+                            leading:
+                                const Icon(Icons.check_box_outlined, size: 20),
+                            title: Text(tr(context, c)),
                           ))
                       .toList(),
                 ),

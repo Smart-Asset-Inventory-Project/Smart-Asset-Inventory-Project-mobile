@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../core/services/asset_service.dart';
+import '../../core/l10n/strings.dart';
 
 /// AST-FR-02: تسجيل أصل جديد بفحص Tag/Serial فريد.
 /// يعرض رسالة الباك اند لو مكرر بدل القبول الصامت.
@@ -65,7 +66,7 @@ class _AddAssetPageState extends State<AddAssetPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Add Asset')),
+      appBar: AppBar(title: Text(tr(context, 'addAsset'))),
       body: Form(
         key: _formKey,
         child: ListView(
@@ -73,24 +74,24 @@ class _AddAssetPageState extends State<AddAssetPage> {
           children: [
             TextFormField(
               controller: _tag,
-              decoration: const InputDecoration(
-                  labelText: 'Tag / QR *', border: OutlineInputBorder()),
+              decoration: InputDecoration(
+                  labelText: '${tr(context, 'assetsCount')} *', border: const OutlineInputBorder()),
               validator: (v) =>
-                  v == null || v.trim().isEmpty ? 'Required' : null,
+                  v == null || v.trim().isEmpty ? tr(context, 'required') : null,
             ),
             const SizedBox(height: 12),
             TextFormField(
               controller: _serial,
-              decoration: const InputDecoration(
-                  labelText: 'Serial', border: OutlineInputBorder()),
+              decoration: InputDecoration(
+                  labelText: tr(context, 'serial'), border: const OutlineInputBorder()),
             ),
             const SizedBox(height: 12),
             DropdownButtonFormField<String>(
               initialValue: _category,
-              decoration: const InputDecoration(
-                  labelText: 'Category', border: OutlineInputBorder()),
-              items: const ['computer', 'screen', 'furniture', 'printer', 'lab']
-                  .map((c) => DropdownMenuItem(value: c, child: Text(c)))
+              decoration: InputDecoration(
+                  labelText: tr(context, 'category'), border: const OutlineInputBorder()),
+              items: ['computer', 'screen', 'furniture', 'printer', 'lab']
+                  .map((c) => DropdownMenuItem(value: c, child: Text(tr(context, c))))
                   .toList(),
               onChanged: (v) => setState(() => _category = v ?? 'computer'),
             ),
@@ -100,16 +101,16 @@ class _AddAssetPageState extends State<AddAssetPage> {
                 Expanded(
                   child: TextFormField(
                     controller: _brand,
-                    decoration: const InputDecoration(
-                        labelText: 'Brand', border: OutlineInputBorder()),
+                    decoration: InputDecoration(
+                        labelText: tr(context, 'brand'), border: const OutlineInputBorder()),
                   ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: TextFormField(
                     controller: _model,
-                    decoration: const InputDecoration(
-                        labelText: 'Model', border: OutlineInputBorder()),
+                    decoration: InputDecoration(
+                        labelText: tr(context, 'model'), border: const OutlineInputBorder()),
                   ),
                 ),
               ],
@@ -117,18 +118,18 @@ class _AddAssetPageState extends State<AddAssetPage> {
             const SizedBox(height: 12),
             TextFormField(
               controller: _location,
-              decoration: const InputDecoration(
-                  labelText: 'Location ID *', border: OutlineInputBorder()),
+              decoration: InputDecoration(
+                  labelText: '${tr(context, 'location')} *', border: const OutlineInputBorder()),
               validator: (v) =>
-                  v == null || v.trim().isEmpty ? 'Required' : null,
+                  v == null || v.trim().isEmpty ? tr(context, 'required') : null,
             ),
             const SizedBox(height: 12),
             DropdownButtonFormField<String>(
               initialValue: _condition,
-              decoration: const InputDecoration(
-                  labelText: 'Condition', border: OutlineInputBorder()),
-              items: const ['good', 'needs_repair', 'damaged']
-                  .map((c) => DropdownMenuItem(value: c, child: Text(c)))
+              decoration: InputDecoration(
+                  labelText: tr(context, 'condition'), border: const OutlineInputBorder()),
+              items: ['good', 'needs_repair', 'damaged']
+                  .map((c) => DropdownMenuItem(value: c, child: Text(tr(context, c))))
                   .toList(),
               onChanged: (v) => setState(() => _condition = v ?? 'good'),
             ),
@@ -136,8 +137,8 @@ class _AddAssetPageState extends State<AddAssetPage> {
             TextFormField(
               controller: _cost,
               keyboardType: TextInputType.number,
-              decoration: const InputDecoration(
-                  labelText: 'Purchase cost', border: OutlineInputBorder()),
+              decoration: InputDecoration(
+                  labelText: tr(context, 'purchaseCost'), border: const OutlineInputBorder()),
             ),
             const SizedBox(height: 20),
             SizedBox(
@@ -146,7 +147,7 @@ class _AddAssetPageState extends State<AddAssetPage> {
                 onPressed: _loading ? null : _submit,
                 child: _loading
                     ? const CircularProgressIndicator()
-                    : const Text('Create asset'),
+                    : Text(tr(context, 'createAsset')),
               ),
             ),
           ],

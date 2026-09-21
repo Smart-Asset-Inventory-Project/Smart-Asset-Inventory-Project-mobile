@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../core/l10n/strings.dart';
 import '../../core/services/location_service.dart';
 import '../../models/asset_model.dart';
 import '../assets/assets_list_page.dart';
@@ -38,7 +39,7 @@ class _LocationsPageState extends State<LocationsPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Locations')),
+      appBar: AppBar(title: Text(tr(context, 'locations'))),
       body: FutureBuilder<List<LocationModel>>(
         future: _future,
         builder: (context, snap) {
@@ -46,10 +47,10 @@ class _LocationsPageState extends State<LocationsPage> {
             return const Center(child: CircularProgressIndicator());
           }
           if (snap.hasError) {
-            return Center(child: Text('Error: ${snap.error}'));
+            return Center(child: Text('${tr(context, 'error')}: ${snap.error}'));
           }
           final all = snap.data ?? [];
-          if (all.isEmpty) return const Center(child: Text('No locations'));
+          if (all.isEmpty) return Center(child: Text(tr(context, 'noLocations')));
           final roots = all.where((l) => l.parentId == null).toList();
           return ListView(
             children: roots
@@ -71,7 +72,7 @@ class _LocationsPageState extends State<LocationsPage> {
       leading: Icon(_icon(loc.level), color: Colors.blue),
       title: Text(loc.name,
           style: const TextStyle(fontWeight: FontWeight.w600)),
-      subtitle: Text(loc.level),
+      subtitle: Text(tr(context, loc.level)),
       trailing: const Icon(Icons.chevron_right),
       onTap: () => Navigator.push(
         context,
@@ -90,13 +91,13 @@ class _LocationsPageState extends State<LocationsPage> {
       leading: Icon(_icon(loc.level), color: Colors.blue),
       title: Text(loc.name,
           style: const TextStyle(fontWeight: FontWeight.w600)),
-      subtitle: Text(loc.level),
+      subtitle: Text(tr(context, loc.level)),
       children: [
         ListTile(
           contentPadding:
               EdgeInsets.only(left: 32 + depth * 20.0, right: 16),
           leading: const Icon(Icons.inventory_2_outlined),
-          title: Text('All assets in ${loc.name}'),
+          title: Text('${tr(context, 'allAssetsIn')} ${loc.name}'),
           onTap: () => Navigator.push(
             context,
             MaterialPageRoute(

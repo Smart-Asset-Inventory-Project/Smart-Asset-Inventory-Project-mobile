@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import '../../core/services/asset_service.dart';
+import '../../core/theme/app_colors.dart';
 import '../../models/asset_model.dart';
 import '../custody/request_transfer_page.dart';
 import '../maintenance/work_orders_page.dart';
 import '../procurement/procurement_page.dart';
 import 'retire_asset_page.dart';
+import '../../core/l10n/strings.dart';
 
 /// AST-FR-02/03/04/10: تفاصيل الأصل. المتقاعد read-only ولا يقبل نقل/صيانة.
 class AssetDetailPage extends StatefulWidget {
@@ -27,7 +29,7 @@ class _AssetDetailPageState extends State<AssetDetailPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Asset Detail')),
+      appBar: AppBar(title: Text(tr(context, 'assetDetail'))),
       body: FutureBuilder<AssetModel>(
         future: _future,
         builder: (context, snap) {
@@ -54,40 +56,68 @@ class _AssetDetailPageState extends State<AssetDetailPage> {
                       color: Colors.grey.shade200,
                       borderRadius: BorderRadius.circular(8),
                     ),
-                    child: const Text(
-                      'RETIRED — read-only, stays in audit reports (AST-FR-10)',
+                    child: Text(
+                      tr(context, 'retired'),
                       textAlign: TextAlign.center,
-                      style: TextStyle(fontWeight: FontWeight.bold),
+                      style: const TextStyle(fontWeight: FontWeight.bold),
                     ),
                   ),
                 Center(
                   child: Column(
                     children: [
-                      const Icon(Icons.qr_code_2_outlined, size: 96),
-                      const SizedBox(height: 8),
+                      Container(
+                        padding: const EdgeInsets.all(24),
+                        decoration: BoxDecoration(
+                          color: AppColors.blue.withValues(alpha: 0.1),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(Icons.inventory_2_outlined,
+                            size: 64, color: AppColors.blue),
+                      ),
+                      const SizedBox(height: 16),
                       Text(a.tag,
                           style: const TextStyle(
-                              fontSize: 20, fontWeight: FontWeight.bold)),
-                      Text('${a.brand ?? ''} ${a.model ?? ''}'),
+                              fontSize: 24, fontWeight: FontWeight.bold)),
+                      Text('${a.brand ?? ''} ${a.model ?? ''}',
+                          style: const TextStyle(
+                              fontSize: 16, color: Colors.grey)),
                     ],
                   ),
                 ),
+                const SizedBox(height: 32),
+                
+                // Card: الأساسيات
+                _sectionCard(context, tr(context, 'overview'), [
+                  _row(tr(context, 'serial'), a.serial ?? '-'),
+                  _row(tr(context, 'category'), tr(context, a.category)),
+                  _row(tr(context, 'status'), tr(context, a.status)),
+                  _row(tr(context, 'condition'), tr(context, a.condition)),
+                ]),
+                
                 const SizedBox(height: 16),
-                _row('Serial', a.serial ?? '-'),
-                _row('Category', a.category),
-                _row('Condition', a.condition),
-                _row('Status', a.status),
-                _row('Location', a.locationId),
-                _row('Custodian', a.custodianId ?? '-'),
-                _row('Purchase cost', a.purchaseCost?.toString() ?? '-'),
-                _row('Purchase date', a.purchaseDate ?? '-'),
-                const SizedBox(height: 20),
+                
+                // Card: الموقع والمسؤولية
+                _sectionCard(context, tr(context, 'location'), [
+                  _row(tr(context, 'location'), a.locationId),
+                  _row(tr(context, 'custodian'), a.custodianId ?? '-'),
+                ]),
+                
+                const SizedBox(height: 16),
+
+                // Card: البيانات المالية
+                _sectionCard(context, tr(context, 'assetValue'), [
+                  _row(tr(context, 'purchaseCost'),
+                      a.purchaseCost?.toString() ?? '-'),
+                  _row(tr(context, 'purchaseDate'), a.purchaseDate ?? '-'),
+                ]),
+
+                const SizedBox(height: 32),
                 Row(
                   children: [
                     Expanded(
                       child: OutlinedButton.icon(
                         icon: const Icon(Icons.swap_horiz),
-                        label: const Text('Transfer'),
+                        label: Text(tr(context, 'transfer')),
                         onPressed: retired
                             ? null
                             : () {
@@ -105,7 +135,7 @@ class _AssetDetailPageState extends State<AssetDetailPage> {
                     Expanded(
                       child: OutlinedButton.icon(
                         icon: const Icon(Icons.build_outlined),
-                        label: const Text('Work order'),
+                        label: Text(tr(context, 'workOrder')),
                         onPressed: retired
                             ? null
                             : () {
@@ -126,7 +156,7 @@ class _AssetDetailPageState extends State<AssetDetailPage> {
                     Expanded(
                       child: OutlinedButton.icon(
                         icon: const Icon(Icons.receipt_long_outlined),
-                        label: const Text('Procurement'),
+                        label: Text(tr(context, 'procurementTitle')),
                         onPressed: () {
                           Navigator.push(
                             context,
@@ -142,7 +172,7 @@ class _AssetDetailPageState extends State<AssetDetailPage> {
                     Expanded(
                       child: OutlinedButton.icon(
                         icon: const Icon(Icons.archive_outlined),
-                        label: const Text('Retire'),
+                        label: Text(tr(context, 'retire')),
                         onPressed: retired
                             ? null
                             : () async {
@@ -174,17 +204,39 @@ class _AssetDetailPageState extends State<AssetDetailPage> {
     );
   }
 
+  Widget _sectionCard(BuildContext context, String title, List<Widget> children) {
+    return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: Colors.grey.shade200),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(title,
+                style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.blue.withValues(alpha: 0.8))),
+            const Divider(height: 24),
+            ...children,
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _row(String k, String v) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
+      padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          SizedBox(
-              width: 130,
-              child: Text(k, style: const TextStyle(color: Colors.grey))),
-          Expanded(
-              child: Text(v,
-                  style: const TextStyle(fontWeight: FontWeight.w600))),
+          Text(k, style: TextStyle(color: Colors.grey.shade600, fontSize: 13)),
+          Text(v, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
         ],
       ),
     );

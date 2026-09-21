@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../core/l10n/strings.dart';
 import '../../core/services/transfer_service.dart';
 import '../../models/transfer_model.dart';
 import 'request_transfer_page.dart';
@@ -26,10 +27,10 @@ class _TransfersPageState extends State<TransfersPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Custody Transfers')),
+      appBar: AppBar(title: Text(tr(context, 'custodyTransfers'))),
       floatingActionButton: FloatingActionButton.extended(
         icon: const Icon(Icons.add),
-        label: const Text('Request'),
+        label: Text(tr(context, 'request')),
         onPressed: () async {
           final ok = await Navigator.push(
             context,
@@ -45,10 +46,10 @@ class _TransfersPageState extends State<TransfersPage> {
             return const Center(child: CircularProgressIndicator());
           }
           if (snap.hasError) {
-            return Center(child: Text('Error: ${snap.error}'));
+            return Center(child: Text('${tr(context, 'required')}: ${snap.error}'));
           }
           final items = snap.data ?? [];
-          if (items.isEmpty) return const Center(child: Text('No transfers'));
+          if (items.isEmpty) return Center(child: Text(tr(context, 'noTransfers')));
           return ListView.separated(
             itemCount: items.length,
             separatorBuilder: (_, __) => const Divider(height: 1),
@@ -64,10 +65,10 @@ class _TransfersPageState extends State<TransfersPage> {
                 title: Text('${t.assetTag} → ${t.toLocation}',
                     style: const TextStyle(fontWeight: FontWeight.bold)),
                 subtitle: Text(
-                    '${t.fromLocation} → ${t.toLocation}\nby ${t.requestedBy} • ${t.requestedAt.substring(0, 10)}'),
+                    '${t.fromLocation} → ${t.toLocation}\n${tr(context, 'by')} ${t.requestedBy} • ${t.requestedAt.substring(0, 10)}'),
                 isThreeLine: true,
                 trailing: Chip(
-                  label: Text(t.status),
+                  label: Text(tr(context, t.status)),
                   backgroundColor: color.withValues(alpha: 0.15),
                 ),
               );

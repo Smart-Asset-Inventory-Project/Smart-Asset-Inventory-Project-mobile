@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:smart_asset_inventory/core/theme/app_colors.dart';
 
+import '../../core/l10n/strings.dart';
 import '../../core/services/insights_service.dart';
 import '../risk/risk_queue_page.dart';
 
@@ -89,12 +90,12 @@ class _DashboardRiskSectionState
 
         // Error
         if (snapshot.hasError) {
-          return const Card(
+          return Card(
             child: Padding(
-              padding: EdgeInsets.all(16),
+              padding: const EdgeInsets.all(16),
               child: Text(
-                'Failed to load maintenance risk',
-                style: TextStyle(
+                tr(context, 'failedRisk'),
+                style: const TextStyle(
                   color: AppColors.red,
                 ),
               ),
@@ -104,11 +105,11 @@ class _DashboardRiskSectionState
 
         // No Data
         if (!snapshot.hasData) {
-          return const Card(
+          return Card(
             child: Padding(
-              padding: EdgeInsets.all(16),
+              padding: const EdgeInsets.all(16),
               child: Text(
-                'No risk data available',
+                tr(context, 'noRisk'),
               ),
             ),
           );
@@ -126,8 +127,8 @@ class _DashboardRiskSectionState
                 // =========================
 
                 _RiskRow(
-                  title: 'High Risk',
-                  value: '${data.high} Assets',
+                  title: tr(context, 'highRisk'),
+                  value: '${data.high} ${tr(context, 'assetsCount')}',
                   icon: Icons.warning_amber_outlined,
                   onTap: () {
                     _openRiskQueue(
@@ -144,8 +145,8 @@ class _DashboardRiskSectionState
                 // =========================
 
                 _RiskRow(
-                  title: 'Medium Risk',
-                  value: '${data.medium} Assets',
+                  title: tr(context, 'medRisk'),
+                  value: '${data.medium} ${tr(context, 'assetsCount')}',
                   icon: Icons.error_outline,
                   onTap: () {
                     _openRiskQueue(
@@ -162,8 +163,8 @@ class _DashboardRiskSectionState
                 // =========================
 
                 _RiskRow(
-                  title: 'Low Risk',
-                  value: '${data.low} Assets',
+                  title: tr(context, 'lowRisk'),
+                  value: '${data.low} ${tr(context, 'assetsCount')}',
                   icon: Icons.check_circle_outline,
                   onTap: () {
                     _openRiskQueue(

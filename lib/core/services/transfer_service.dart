@@ -21,8 +21,7 @@ class TransferService {
               TransferModel.fromJson(Map<String, dynamic>.from(e as Map)))
           .toList();
     } on DioException catch (e) {
-      if (e.type == DioExceptionType.connectionError ||
-          e.type == DioExceptionType.connectionTimeout) {
+      if (AppConstants.allowMockFallback && e.response == null) {
         return _mock();
       }
       rethrow;
@@ -46,8 +45,7 @@ class TransferService {
       final data = res.data is Map ? res.data['data'] ?? res.data : {};
       return TransferModel.fromJson(Map<String, dynamic>.from(data as Map));
     } on DioException catch (e) {
-      if (e.type == DioExceptionType.connectionError ||
-          e.type == DioExceptionType.connectionTimeout) {
+      if (AppConstants.allowMockFallback && e.response == null) {
         // mock accept محلي حتى يجهز الباك اند
         return TransferModel(
           id: 'mock-${DateTime.now().millisecondsSinceEpoch}',

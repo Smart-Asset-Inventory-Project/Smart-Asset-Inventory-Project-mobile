@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import '../../core/services/asset_service.dart';
+import '../../core/theme/app_colors.dart';
 import '../../models/asset_model.dart';
 import 'add_asset_page.dart';
 import 'asset_detail_page.dart';
+import '../../core/l10n/strings.dart';
 
 /// AST-FR-01/02: بحث وعرض الأصول بكل مستوى + فلتر فئة.
 class AssetsListPage extends StatefulWidget {
@@ -35,7 +37,10 @@ class _AssetsListPageState extends State<AssetsListPage> {
     if (initial) {
       _future = f;
     } else {
-      setState(() => _future = f);
+      // أقواس عادية: الـ arrow كانت ترجع Future وتكسر setState
+      setState(() {
+        _future = f;
+      });
     }
   }
 
@@ -45,16 +50,46 @@ class _AssetsListPageState extends State<AssetsListPage> {
     super.dispose();
   }
 
+  IconData _catIcon(String cat) {
+    switch (cat.toLowerCase()) {
+      case 'computer':
+        return Icons.computer_outlined;
+      case 'screen':
+        return Icons.monitor_outlined;
+      case 'furniture':
+        return Icons.chair_outlined;
+      case 'printer':
+        return Icons.print_outlined;
+      case 'lab':
+        return Icons.science_outlined;
+      default:
+        return Icons.inventory_2_outlined;
+    }
+  }
+
+  Color _statusColor(String status) {
+    switch (status.toLowerCase()) {
+      case 'active':
+        return AppColors.green;
+      case 'in_maintenance':
+        return AppColors.orange;
+      case 'retired':
+        return AppColors.grey;
+      default:
+        return AppColors.blue;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
           title: Text(widget.locationName == null
-              ? 'Assets'
-              : 'Assets • ${widget.locationName}')),
+              ? tr(context, 'assets')
+              : '${tr(context, 'assets')} • ${widget.locationName}')),
       floatingActionButton: FloatingActionButton.extended(
         icon: const Icon(Icons.add),
-        label: const Text('Add'),
+        label: Text(tr(context, 'add')),
         onPressed: () async {
           final ok = await Navigator.push(
             context,
@@ -71,7 +106,7 @@ class _AssetsListPageState extends State<AssetsListPage> {
               controller: _search,
               onSubmitted: (_) => _reload(),
               decoration: InputDecoration(
-                hintText: 'Search by tag / serial / category',
+                hintText: tr(context, 'searchHint'),
                 prefixIcon: const Icon(Icons.search),
                 suffixIcon: IconButton(
                   icon: const Icon(Icons.clear),
@@ -94,7 +129,7 @@ class _AssetsListPageState extends State<AssetsListPage> {
               runSpacing: 4,
               children: ['all', 'computer', 'screen', 'furniture', 'printer', 'lab']
                   .map((c) => ChoiceChip(
-                        label: Text(c),
+                        label: Text(tr(context, c)),
                         selected: _category == c,
                         onSelected: (_) {
                           _category = c;
@@ -132,25 +167,60 @@ class _AssetsListPageState extends State<AssetsListPage> {
                   return const Center(child: Text('No assets found'));
                 }
                 return ListView.separated(
+                  padding: const EdgeInsets.only(bottom: 24),
                   itemCount: items.length,
-                  separatorBuilder: (_, __) => const Divider(height: 1),
+                  separatorBuilder: (_, __) => const SizedBox(height: 8),
                   itemBuilder: (context, i) {
                     final a = items[i];
-                    return ListTile(
-                      leading: CircleAvatar(
-                        child: Text(a.category.isNotEmpty
-                            ? a.category[0].toUpperCase()
-                            : 'A'),
+                    final sColor = _statusColor(a.status);
+                    return Card(
+                      margin: const EdgeInsets.symmetric(horizontal: 12),
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        side: BorderSide(color: Colors.grey.shade200),
                       ),
-                      title: Text(a.tag,
-                          style: const TextStyle(fontWeight: FontWeight.bold)),
-                      subtitle: Text(
-                          '${a.category} • ${a.status} • ${a.locationId}'),
-                      trailing: const Icon(Icons.qr_code_2_outlined),
-                      onTap: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => AssetDetailPage(assetId: a.id),
+                      child: ListTile(
+                        leading: Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: Colors.blue.shade50,
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Icon(_catIcon(a.category), color: AppColors.blue),
+                        ),
+                        title: Text(a.tag,
+                            style: const TextStyle(fontWeight: FontWeight.bold)),
+                        subtitle: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const SizedBox(height: 4),
+                            Text('${tr(context, a.category)} • ${a.locationId}',
+                                style: const TextStyle(fontSize: 12)),
+                            const SizedBox(height: 6),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 8, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: sColor.withValues(alpha: 0.1),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Text(
+                                tr(context, a.status),
+                                style: TextStyle(
+                                    color: sColor,
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.bold),
+                              ),
+                            ),
+                          ],
+                        ),
+                        trailing: const Icon(Icons.chevron_right_outlined, size: 20),
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => AssetDetailPage(assetId: a.id),
+                          ),
                         ),
                       ),
                     );

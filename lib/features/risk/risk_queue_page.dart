@@ -69,7 +69,7 @@
 
 
 import 'package:flutter/material.dart';
-
+import '../../core/l10n/strings.dart';
 import '../../core/services/insights_service.dart';
 import '../../models/work_order_model.dart';
 
@@ -125,19 +125,19 @@ class _RiskQueuePageState extends State<RiskQueuePage> {
   // Page Title
   // =====================================================
 
-  String get _pageTitle {
+  String _pageTitle(BuildContext context) {
     switch (widget.riskBand?.toLowerCase()) {
       case 'high':
-        return 'High Risk';
+        return tr(context, 'highRisk');
 
       case 'medium':
-        return 'Medium Risk';
+        return tr(context, 'medRisk');
 
       case 'low':
-        return 'Low Risk';
+        return tr(context, 'lowRisk');
 
       default:
-        return 'Maintenance Risk Queue';
+        return tr(context, 'riskQueue');
     }
   }
 
@@ -190,7 +190,7 @@ class _RiskQueuePageState extends State<RiskQueuePage> {
     return Scaffold(
       appBar: AppBar(
         title: Text(
-          _pageTitle,
+          _pageTitle(context),
           style: const TextStyle(
             fontWeight: FontWeight.bold,
           ),
@@ -219,7 +219,7 @@ class _RiskQueuePageState extends State<RiskQueuePage> {
           if (snapshot.hasError) {
             return Center(
               child: Text(
-                'Error: ${snapshot.error}',
+                '${tr(context, 'failedRisk')}: ${snapshot.error}',
               ),
             );
           }
@@ -238,8 +238,8 @@ class _RiskQueuePageState extends State<RiskQueuePage> {
             return Center(
               child: Text(
                 widget.riskBand == null
-                    ? 'No risks'
-                    : 'No ${widget.riskBand} risks',
+                    ? tr(context, 'noRisks')
+                    : tr(context, 'noSpecificRisks'),
               ),
             );
           }
@@ -272,14 +272,14 @@ class _RiskQueuePageState extends State<RiskQueuePage> {
                 ),
 
                 title: Text(
-                  '${r.assetTag} • ${r.band.toUpperCase()}',
+                  '${r.assetTag} • ${tr(context, '${r.band.toLowerCase()}Risk')}',
                   style: const TextStyle(
                     fontWeight: FontWeight.bold,
                   ),
                 ),
 
                 subtitle: Text(
-                  'score ${r.score.toStringAsFixed(2)}\n'
+                  '${tr(context, 'scoreLabel')} ${r.score.toStringAsFixed(2)}\n'
                       '${r.reasons.join(' • ')}',
                 ),
 

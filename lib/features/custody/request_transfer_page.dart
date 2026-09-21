@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../core/l10n/strings.dart';
 import '../../core/services/transfer_service.dart';
 
 /// AST-FR-04: نموذج طلب نقل. العهدة الحالية تظل سارية حتى الاعتماد.
@@ -44,7 +45,7 @@ class _RequestTransferPageState extends State<RequestTransferPage> {
       if (!mounted) return;
       Navigator.pop(context, true);
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Transfer requested (pending approval)')),
+        SnackBar(content: Text(tr(context, 'transferRequested'))),
       );
     } catch (e) {
       if (!mounted) return;
@@ -58,7 +59,7 @@ class _RequestTransferPageState extends State<RequestTransferPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Request Transfer')),
+      appBar: AppBar(title: Text(tr(context, 'requestTransfer'))),
       body: Form(
         key: _formKey,
         child: ListView(
@@ -66,25 +67,25 @@ class _RequestTransferPageState extends State<RequestTransferPage> {
           children: [
             TextFormField(
               controller: _asset,
-              decoration: const InputDecoration(
-                  labelText: 'Asset ID / Tag', border: OutlineInputBorder()),
+              decoration: InputDecoration(
+                  labelText: tr(context, 'assetIdTag'), border: const OutlineInputBorder()),
               validator: (v) =>
-                  v == null || v.trim().isEmpty ? 'Required' : null,
+                  v == null || v.trim().isEmpty ? tr(context, 'required') : null,
             ),
             const SizedBox(height: 12),
             TextFormField(
               controller: _toLocation,
-              decoration: const InputDecoration(
-                  labelText: 'To location ID', border: OutlineInputBorder()),
+              decoration: InputDecoration(
+                  labelText: tr(context, 'toLocationId'), border: const OutlineInputBorder()),
               validator: (v) =>
-                  v == null || v.trim().isEmpty ? 'Required' : null,
+                  v == null || v.trim().isEmpty ? tr(context, 'required') : null,
             ),
             const SizedBox(height: 12),
             TextFormField(
               controller: _toCustodian,
-              decoration: const InputDecoration(
-                  labelText: 'To custodian (optional)',
-                  border: OutlineInputBorder()),
+              decoration: InputDecoration(
+                  labelText: tr(context, 'toCustodianOptional'),
+                  border: const OutlineInputBorder()),
             ),
             const SizedBox(height: 20),
             SizedBox(
@@ -93,7 +94,7 @@ class _RequestTransferPageState extends State<RequestTransferPage> {
                 onPressed: _loading ? null : _submit,
                 child: _loading
                     ? const CircularProgressIndicator()
-                    : const Text('Submit request'),
+                    : Text(tr(context, 'submitRequest')),
               ),
             ),
           ],

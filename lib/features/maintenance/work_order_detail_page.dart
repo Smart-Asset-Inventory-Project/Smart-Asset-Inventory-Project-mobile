@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../core/l10n/strings.dart';
 import '../../core/services/work_order_service.dart';
 import '../../models/work_order_model.dart';
 
@@ -59,45 +60,45 @@ class _WorkOrderDetailPageState extends State<WorkOrderDetailPage> {
     final w = widget.workOrder;
     final closed = w.status == 'closed';
     return Scaffold(
-      appBar: AppBar(title: Text('WO ${w.id}')),
+      appBar: AppBar(title: Text('${tr(context, 'workOrder')} ${w.id}')),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          _row('Asset', w.assetId),
-          _row('Priority', w.priority),
-          _row('Status', w.status),
-          _row('Technician', w.technicianId ?? '-'),
-          _row('Scheduled', w.scheduledDate ?? '-'),
-          _row('Notes', w.notes ?? '-'),
+          _row(tr(context, 'assets'), w.assetId),
+          _row(tr(context, 'priority'), tr(context, w.priority)),
+          _row(tr(context, 'status'), tr(context, w.status)),
+          _row(tr(context, 'technician'), w.technicianId ?? '-'),
+          _row(tr(context, 'scheduled'), w.scheduledDate ?? '-'),
+          _row(tr(context, 'notes'), w.notes ?? '-'),
           const Divider(height: 32),
           if (!closed) ...[
-            const Text('Close work order',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+            Text(tr(context, 'closeWorkOrder'),
+                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
             const SizedBox(height: 12),
             TextField(
               controller: _notes,
               maxLines: 3,
-              decoration: const InputDecoration(
-                labelText: 'Completion notes *',
-                border: OutlineInputBorder(),
+              decoration: InputDecoration(
+                labelText: '${tr(context, 'completionNotes')} *',
+                border: const OutlineInputBorder(),
               ),
             ),
             const SizedBox(height: 12),
             TextField(
               controller: _parts,
               keyboardType: TextInputType.number,
-              decoration: const InputDecoration(
-                labelText: 'Parts cost (optional)',
-                border: OutlineInputBorder(),
+              decoration: InputDecoration(
+                labelText: tr(context, 'partsCost'),
+                border: const OutlineInputBorder(),
               ),
             ),
             const SizedBox(height: 12),
             TextField(
               controller: _downtime,
               keyboardType: TextInputType.number,
-              decoration: const InputDecoration(
-                labelText: 'Downtime hours (optional)',
-                border: OutlineInputBorder(),
+              decoration: InputDecoration(
+                labelText: tr(context, 'downtimeHours'),
+                border: const OutlineInputBorder(),
               ),
             ),
             const SizedBox(height: 16),
@@ -107,11 +108,11 @@ class _WorkOrderDetailPageState extends State<WorkOrderDetailPage> {
                 onPressed: _loading ? null : _close,
                 child: _loading
                     ? const CircularProgressIndicator()
-                    : const Text('Close work order'),
+                    : Text(tr(context, 'closeWorkOrder')),
               ),
             ),
           ] else
-            const Text('This work order is closed (read-only).'),
+            Text(tr(context, 'readOnlyOrder')),
         ],
       ),
     );

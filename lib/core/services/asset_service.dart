@@ -31,8 +31,7 @@ class AssetService {
           .map((e) => AssetModel.fromJson(Map<String, dynamic>.from(e as Map)))
           .toList();
     } on DioException catch (e) {
-      if (e.type == DioExceptionType.connectionError ||
-          e.type == DioExceptionType.connectionTimeout) {
+      if (AppConstants.allowMockFallback && e.response == null) {
         return _mockAssets(
             query: query, category: category, locationId: locationId);
       }
@@ -46,8 +45,7 @@ class AssetService {
       final data = res.data is Map ? res.data['data'] ?? res.data : {};
       return AssetModel.fromJson(Map<String, dynamic>.from(data as Map));
     } on DioException catch (e) {
-      if (e.type == DioExceptionType.connectionError ||
-          e.type == DioExceptionType.connectionTimeout) {
+      if (AppConstants.allowMockFallback && e.response == null) {
         return _mockAssets().firstWhere((a) => a.id == id,
             orElse: () => _mockAssets().first);
       }
@@ -67,8 +65,7 @@ class AssetService {
             e.response?.data?['message']?.toString() ?? 'Duplicate tag/serial';
         throw Exception(msg);
       }
-      if (e.type == DioExceptionType.connectionError ||
-          e.type == DioExceptionType.connectionTimeout) {
+      if (AppConstants.allowMockFallback && e.response == null) {
         // mock accept محلي حتى يجهز الباك اند
         return AssetModel.fromJson({
           'id': 'mock-${DateTime.now().millisecondsSinceEpoch}',

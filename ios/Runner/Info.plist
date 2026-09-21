@@ -43,6 +43,8 @@
 	</array>
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
+	<key>NSCameraUsageDescription</key>
+	<string>Scan asset QR codes for stocktake (AST-FR-07)</string>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
 </dict>

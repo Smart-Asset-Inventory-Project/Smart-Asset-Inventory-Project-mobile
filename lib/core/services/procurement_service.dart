@@ -18,8 +18,7 @@ class ProcurementService {
       return ProcurementInfo.fromJson(
           Map<String, dynamic>.from(data as Map));
     } on DioException catch (e) {
-      if (e.type == DioExceptionType.connectionError ||
-          e.type == DioExceptionType.connectionTimeout) {
+      if (AppConstants.allowMockFallback && e.response == null) {
         return ProcurementInfo(
           assetId: assetId,
           supplier: 'Mock Supplier Co.',
