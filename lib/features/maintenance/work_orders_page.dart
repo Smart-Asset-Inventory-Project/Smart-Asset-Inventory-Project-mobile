@@ -2,45 +2,68 @@ import 'package:flutter/material.dart';
 import '../../core/l10n/strings.dart';
 import '../../core/services/work_order_service.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/widgets/role_gate.dart';
 import '../../models/work_order_model.dart';
+import 'create_work_order_page.dart';
 import 'work_order_detail_page.dart';
 
 /// AST-FR-06: قائمة أوامر الشغل مع فلتر حالة.
+/// initialStatus يفتح الصفحة على فلتر جاهز (من كروت الداشبورد).
 class WorkOrdersPage extends StatefulWidget {
-  const WorkOrdersPage({super.key});
+  final String? initialStatus;
+  const WorkOrdersPage({super.key, this.initialStatus});
 
   @override
   State<WorkOrdersPage> createState() => _WorkOrdersPageState();
 }
 
 class _WorkOrdersPageState extends State<WorkOrdersPage> {
-  String _status = 'all';
+  late String _status;
   late Future<List<WorkOrderModel>> _future;
 
   @override
   void initState() {
     super.initState();
-    _reload();
+    _status = widget.initialStatus ?? 'all';
+    _reload(initial: true);
   }
 
-  void _reload() {
-    setState(() {
-      _future = WorkOrderService().fetchWorkOrders(
-          status: _status == 'all' ? null : _status);
-    });
+  void _reload({bool initial = false}) {
+    final f = WorkOrderService().fetchWorkOrders(
+        status: _status == 'all' ? null : _status);
+    if (initial) {
+      _future = f;
+    } else {
+      setState(() {
+        _future = f;
+      });
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: Text(tr(context, 'workOrders'))),
+      floatingActionButton: HideForAuditor(
+        child: FloatingActionButton.extended(
+          icon: const Icon(Icons.add),
+          label: Text(tr(context, 'add')),
+          onPressed: () async {
+            final ok = await Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const CreateWorkOrderPage()),
+            );
+            if (ok == true) _reload();
+          },
+        ),
+      ),
       body: Column(
         children: [
           SingleChildScrollView(
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.all(12),
             child: Row(
-              children: ['all', 'open', 'inProgress', 'closed']
+              children: ['all', 'open', 'inProgress', 'closed', 'cancelled']
                   .map((s) => Padding(
                         padding: const EdgeInsets.only(right: 8),
                         child: ChoiceChip(

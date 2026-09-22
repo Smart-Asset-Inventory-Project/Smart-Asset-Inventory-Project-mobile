@@ -8,12 +8,16 @@ import '../../models/user_model.dart';
 import '../auth/login_page.dart';
 
 import '../assets/assets_list_page.dart';
+import '../categories/categories_page.dart';
 import '../custody/transfers_page.dart';
 import '../locations/locations_page.dart';
 import '../maintenance/templates_page.dart';
 import '../maintenance/work_orders_page.dart';
+import '../procurement/procurement_overview_page.dart';
+import '../retirement/retirements_page.dart';
 import '../risk/risk_queue_page.dart';
 import 'dashboard_risk_section.dart';
+import 'dashboard_sections.dart';
 import 'dashboard_stats.dart';
 
 class DashboardPage extends StatefulWidget {
@@ -26,7 +30,22 @@ class DashboardPage extends StatefulWidget {
 class _DashboardPageState extends State<DashboardPage> {
   UserModel? _user;
 
-  /// معاينة ديمو فقط حتى يجهز الباك اند ويرجع الدور الحقيقي.
+  @override
+  void initState() {
+    super.initState();
+    _loadUser();
+  }
+
+  Future<void> _loadUser() async {
+    final u = await AuthService().currentUser();
+    if (mounted) {
+      setState(() {
+        _user = u;
+      });
+    }
+  }
+
+  /// دور المستخدم الحقيقي بعد تسجيل الدخول AST-FR-08.
   UserRole get _role => _user?.role ?? UserRole.unknown;
 
   /// Quick actions حسب الدور AST-FR-08.
@@ -37,6 +56,11 @@ class _DashboardPageState extends State<DashboardPage> {
       title: tr(context, 'assets'),
       icon: Icons.inventory_2_outlined,
       page: const AssetsListPage(),
+    );
+    final custodianAssets = (
+      title: tr(context, 'assets'),
+      icon: Icons.inventory_2_outlined,
+      page: AssetsListPage(scopeLocationId: _user?.collegeScope)
     );
     final maint = (
       title: tr(context, 'maintenance'),
@@ -58,11 +82,12 @@ class _DashboardPageState extends State<DashboardPage> {
       icon: Icons.location_city_outlined,
       page: const LocationsPage(),
     );
+
     switch (_role) {
       case UserRole.procurement:
         return [assets, transfer, locations, risk];
       case UserRole.custodian:
-        return [assets, transfer, risk, locations];
+        return [custodianAssets, transfer, risk, locations];
       case UserRole.technician:
         return [maint, assets, transfer, locations];
       case UserRole.auditor:
@@ -164,6 +189,13 @@ class _DashboardPageState extends State<DashboardPage> {
           padding: EdgeInsets.zero,
           children: [
             UserAccountsDrawerHeader(
+              decoration: const BoxDecoration(
+                color: AppColors.blue,
+              ),
+              currentAccountPicture: const CircleAvatar(
+                backgroundColor: Colors.white,
+                child: Icon(Icons.person, size: 38, color: AppColors.blue),
+              ),
               accountName: Text(
                 _user?.name.trim().isEmpty ?? true
                     ? (Localizations.localeOf(context).languageCode == 'ar'
@@ -172,29 +204,26 @@ class _DashboardPageState extends State<DashboardPage> {
                     : _user!.name,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontWeight: FontWeight.bold),
               ),
               accountEmail: Text(
-                _user?.email ?? '',
+                '${_user?.email ?? ''} • ${tr(context, _role.name)}',
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-              ),
-              currentAccountPicture: const CircleAvatar(
-                child: Icon(Icons.person, size: 35),
               ),
             ),
 
             ListTile(
               leading: const Icon(Icons.dashboard_outlined),
               title: Text(tr(context, 'dashboard')),
-              onTap: () {
-                Navigator.pop(context);
-              },
+              onTap: () => Navigator.pop(context),
             ),
 
             ListTile(
               leading: const Icon(Icons.inventory_2_outlined),
               title: Text(tr(context, 'assets')),
               onTap: () {
+                Navigator.pop(context);
                 Navigator.push(
                   context,
                   MaterialPageRoute(builder: (_) => const AssetsListPage()),
@@ -203,12 +232,25 @@ class _DashboardPageState extends State<DashboardPage> {
             ),
 
             ListTile(
-              leading: const Icon(Icons.location_city_outlined),
-              title: Text(tr(context, 'locations')),
+              leading: const Icon(Icons.swap_horiz),
+              title: Text(tr(context, 'custodyTransfers')),
               onTap: () {
+                Navigator.pop(context);
                 Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (_) => const LocationsPage()),
+                  MaterialPageRoute(builder: (_) => const TransfersPage()),
+                );
+              },
+            ),
+
+            ListTile(
+              leading: const Icon(Icons.build_outlined),
+              title: Text(tr(context, 'workOrders')),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const WorkOrdersPage()),
                 );
               },
             ),
@@ -217,6 +259,7 @@ class _DashboardPageState extends State<DashboardPage> {
               leading: const Icon(Icons.warning_amber_outlined),
               title: Text(tr(context, 'riskQueue')),
               onTap: () {
+                Navigator.pop(context);
                 Navigator.push(
                   context,
                   MaterialPageRoute(builder: (_) => const RiskQueuePage()),
@@ -225,15 +268,72 @@ class _DashboardPageState extends State<DashboardPage> {
             ),
 
             ListTile(
+              leading: const Icon(Icons.location_city_outlined),
+              title: Text(tr(context, 'locations')),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const LocationsPage()),
+                );
+              },
+            ),
+
+            ListTile(
               leading: const Icon(Icons.event_repeat_outlined),
               title: Text(tr(context, 'templates')),
               onTap: () {
+                Navigator.pop(context);
                 Navigator.push(
                   context,
                   MaterialPageRoute(builder: (_) => const TemplatesPage()),
                 );
               },
             ),
+
+            if (_role == UserRole.admin ||
+                _role == UserRole.procurement ||
+                _role == UserRole.auditor)
+              ListTile(
+                leading: const Icon(Icons.shopping_cart_outlined),
+                title: Text(tr(context, 'procurementTitle')),
+                onTap: () {
+                  Navigator.pop(context);
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                        builder: (_) => const ProcurementOverviewPage()),
+                  );
+                },
+              ),
+
+            if (_role == UserRole.admin)
+              ListTile(
+                leading: const Icon(Icons.folder_outlined),
+                title: Text(tr(context, 'category')),
+                onTap: () {
+                  Navigator.pop(context);
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                        builder: (_) => const CategoriesPage()),
+                  );
+                },
+              ),
+
+            if (_role == UserRole.admin || _role == UserRole.auditor)
+              ListTile(
+                leading: const Icon(Icons.archive_outlined),
+                title: Text(tr(context, 'retireRequests')),
+                onTap: () {
+                  Navigator.pop(context);
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                        builder: (_) => const RetirementsPage()),
+                  );
+                },
+              ),
 
             ListTile(
               leading: const Icon(Icons.settings_outlined),
@@ -371,6 +471,11 @@ class _DashboardPageState extends State<DashboardPage> {
                 const DashboardRiskSection(),
                 const SizedBox(height: 24),
               ],
+
+              // =========================
+              // Role sections AST-FR-08
+              // =========================
+              DashboardSections(user: _user),
 
               // =========================
               // Quick Actions - حسب الدور AST-FR-08

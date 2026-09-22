@@ -16,12 +16,18 @@ class UserModel {
   });
 
   factory UserModel.fromJson(Map<String, dynamic> json) {
+    // الباك اند: role كائن {name} أو نص. collegeScope من scopeLocationId.
+    final rawRole = json['role'];
+    final roleName =
+        rawRole is Map ? rawRole['name']?.toString() : rawRole?.toString();
     return UserModel(
       id: (json['id'] ?? json['_id'] ?? '').toString(),
       name: (json['name'] ?? '').toString(),
       email: (json['email'] ?? '').toString(),
-      role: UserRole.fromString(json['role']?.toString()),
-      collegeScope: json['collegeId']?.toString() ?? json['scope']?.toString(),
+      role: UserRole.fromString(roleName),
+      collegeScope: json['scopeLocationId']?.toString() ??
+          json['collegeId']?.toString() ??
+          json['scope']?.toString(),
     );
   }
 

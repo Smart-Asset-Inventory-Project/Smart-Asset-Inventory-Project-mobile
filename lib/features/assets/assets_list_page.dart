@@ -1,16 +1,31 @@
 import 'package:flutter/material.dart';
 import '../../core/services/asset_service.dart';
+import '../../core/services/catalog_service.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/widgets/role_gate.dart';
 import '../../models/asset_model.dart';
 import 'add_asset_page.dart';
 import 'asset_detail_page.dart';
+import 'import_assets_page.dart';
 import '../../core/l10n/strings.dart';
 
 /// AST-FR-01/02: بحث وعرض الأصول بكل مستوى + فلتر فئة.
+/// الفئات من /categories الحقيقية، وبديل محلي عند غياب السيرفر.
 class AssetsListPage extends StatefulWidget {
   final String? locationId;
   final String? locationName;
-  const AssetsListPage({super.key, this.locationId, this.locationName});
+
+  /// فلتر فئة مبدئي (من قسم byCategory في الداشبورد).
+  final String? initialCategory;
+
+  /// نطاق الكاستوديان (scopeLocationId): يفلتر الأصول بالنطاق.
+  final String? scopeLocationId;
+  const AssetsListPage(
+      {super.key,
+      this.locationId,
+      this.locationName,
+      this.initialCategory,
+      this.scopeLocationId});
 
   @override
   State<AssetsListPage> createState() => _AssetsListPageState();
@@ -19,13 +34,27 @@ class AssetsListPage extends StatefulWidget {
 class _AssetsListPageState extends State<AssetsListPage> {
   final _service = AssetService();
   final _search = TextEditingController();
-  String _category = 'all';
+  late String _category;
+  List<String> _categories = const [
+    'computer',
+    'screen',
+    'furniture',
+    'printer',
+    'lab'
+  ];
   late Future<List<AssetModel>> _future;
 
   @override
   void initState() {
     super.initState();
+    _category = widget.initialCategory ?? 'all';
     _reload(initial: true);
+    CatalogService().fetchCategories().then((cats) {
+      if (!mounted || cats.isEmpty) return;
+      setState(() {
+        _categories = cats.map((c) => c.name).toList();
+      });
+    }).catchError((_) {});
   }
 
   void _reload({bool initial = false}) {
@@ -33,6 +62,7 @@ class _AssetsListPageState extends State<AssetsListPage> {
       query: _search.text.trim().isEmpty ? null : _search.text.trim(),
       category: _category == 'all' ? null : _category,
       locationId: widget.locationId,
+      scopeLocationId: widget.scopeLocationId,
     );
     if (initial) {
       _future = f;
@@ -86,17 +116,35 @@ class _AssetsListPageState extends State<AssetsListPage> {
       appBar: AppBar(
           title: Text(widget.locationName == null
               ? tr(context, 'assets')
-              : '${tr(context, 'assets')} • ${widget.locationName}')),
-      floatingActionButton: FloatingActionButton.extended(
-        icon: const Icon(Icons.add),
-        label: Text(tr(context, 'add')),
-        onPressed: () async {
-          final ok = await Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => const AddAssetPage()),
-          );
-          if (ok == true) _reload();
-        },
+              : '${tr(context, 'assets')} • ${widget.locationName}'),
+          actions: [
+            HideForAuditor(
+              child: IconButton(
+                tooltip: 'Import CSV',
+                icon: const Icon(Icons.upload_file_outlined),
+                onPressed: () async {
+                  await Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                        builder: (_) => const ImportAssetsPage()),
+                  );
+                  _reload();
+                },
+              ),
+            ),
+          ]),
+      floatingActionButton: HideForAuditor(
+        child: FloatingActionButton.extended(
+          icon: const Icon(Icons.add),
+          label: Text(tr(context, 'add')),
+          onPressed: () async {
+            final ok = await Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const AddAssetPage()),
+            );
+            if (ok == true) _reload();
+          },
+        ),
       ),
       body: Column(
         children: [
@@ -108,28 +156,30 @@ class _AssetsListPageState extends State<AssetsListPage> {
               decoration: InputDecoration(
                 hintText: tr(context, 'searchHint'),
                 prefixIcon: const Icon(Icons.search),
-                suffixIcon: IconButton(
-                  icon: const Icon(Icons.clear),
-                  onPressed: () {
-                    _search.clear();
-                    _reload();
-                  },
-                ),
+                suffixIcon: _search.text.isNotEmpty
+                    ? IconButton(
+                        icon: const Icon(Icons.clear),
+                        onPressed: () {
+                          _search.clear();
+                          _reload();
+                        },
+                      )
+                    : null,
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                 ),
               ),
             ),
           ),
-          // فلتر الفئة: Wrap يعرض كل الشيبس بدون سكرول أفقي
+          // فلتر الفئة من /categories: Wrap يعرض كل الشيبس بدون سكرول
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 12),
             child: Wrap(
               spacing: 8,
               runSpacing: 4,
-              children: ['all', 'computer', 'screen', 'furniture', 'printer', 'lab']
+              children: ['all', ..._categories]
                   .map((c) => ChoiceChip(
-                        label: Text(tr(context, c)),
+                        label: Text(c == 'all' ? tr(context, 'all') : c),
                         selected: _category == c,
                         onSelected: (_) {
                           _category = c;

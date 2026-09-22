@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../core/l10n/strings.dart';
 import '../../core/services/work_order_service.dart';
+import '../../core/widgets/role_gate.dart';
 import '../../models/work_order_model.dart';
 
 /// AST-FR-06: تفاصيل الأمر + إغلاق يحدث service history و next due في الباك اند.
@@ -58,7 +59,7 @@ class _WorkOrderDetailPageState extends State<WorkOrderDetailPage> {
   @override
   Widget build(BuildContext context) {
     final w = widget.workOrder;
-    final closed = w.status == 'closed';
+    final closed = w.status == 'closed' || w.status == 'cancelled';
     return Scaffold(
       appBar: AppBar(title: Text('${tr(context, 'workOrder')} ${w.id}')),
       body: ListView(
@@ -69,10 +70,18 @@ class _WorkOrderDetailPageState extends State<WorkOrderDetailPage> {
           _row(tr(context, 'status'), tr(context, w.status)),
           _row(tr(context, 'technician'), w.technicianId ?? '-'),
           _row(tr(context, 'scheduled'), w.scheduledDate ?? '-'),
+          if (w.completedAt != null)
+            _row(tr(context, 'completed'), w.completedAt!),
+          if (w.title != null && w.title!.isNotEmpty)
+            _row('title', w.title!),
           _row(tr(context, 'notes'), w.notes ?? '-'),
           const Divider(height: 32),
           if (!closed) ...[
-            Text(tr(context, 'closeWorkOrder'),
+            HideForAuditor(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(tr(context, 'closeWorkOrder'),
                 style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
             const SizedBox(height: 12),
             TextField(
@@ -109,6 +118,9 @@ class _WorkOrderDetailPageState extends State<WorkOrderDetailPage> {
                 child: _loading
                     ? const CircularProgressIndicator()
                     : Text(tr(context, 'closeWorkOrder')),
+              ),
+            ),
+                ],
               ),
             ),
           ] else

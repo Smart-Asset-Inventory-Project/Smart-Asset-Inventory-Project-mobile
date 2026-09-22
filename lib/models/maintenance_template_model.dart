@@ -1,9 +1,13 @@
-/// AST-FR-05: قالب صيانة حسب الفئة أو الموديل.
-/// calendar/runtime/condition trigger + حساب next due من آخر خدمة.
+import 'dart:convert';
+
+/// AST-FR-05: قالب صيانة الباك اند.
+/// {id,name,description,frequencyDays,tasks(JSON string),categoryId}.
 class MaintenanceTemplate {
   final String id;
   final String name;
-  final String category; // نطاق الفئة أو الموديل
+  final String category; // اسم الفئة أو نطاقها
+  final String? categoryId;
+  final String? description;
   final String triggerType; // calendar, runtime, condition
   final int? intervalDays;
   final int? runtimeHours;
@@ -15,6 +19,8 @@ class MaintenanceTemplate {
     required this.id,
     required this.name,
     required this.category,
+    this.categoryId,
+    this.description,
     required this.triggerType,
     this.intervalDays,
     this.runtimeHours,
@@ -23,18 +29,32 @@ class MaintenanceTemplate {
     this.lastServiceDate,
   });
 
+  static List<String> _tasks(dynamic raw) {
+    if (raw == null) return [];
+    if (raw is List) return raw.map((e) => e.toString()).toList();
+    if (raw is String) {
+      try {
+        final d = jsonDecode(raw);
+        if (d is List) return d.map((e) => e.toString()).toList();
+      } catch (_) {}
+      return [raw];
+    }
+    return [];
+  }
+
   factory MaintenanceTemplate.fromJson(Map<String, dynamic> json) =>
       MaintenanceTemplate(
         id: json['id'].toString(),
         name: (json['name'] ?? '').toString(),
-        category: (json['category'] ?? '').toString(),
+        category: (json['category'] ?? json['categoryId'] ?? '').toString(),
+        categoryId: json['categoryId']?.toString(),
+        description: json['description']?.toString(),
         triggerType: (json['triggerType'] ?? 'calendar').toString(),
-        intervalDays: (json['intervalDays'] as num?)?.toInt(),
+        intervalDays: (json['frequencyDays'] ?? json['intervalDays'] as num?)
+            ?.toInt(),
         runtimeHours: (json['runtimeHours'] as num?)?.toInt(),
         conditionRule: json['conditionRule']?.toString(),
-        checklist: ((json['checklist'] as List?) ?? [])
-            .map((e) => e.toString())
-            .toList(),
+        checklist: _tasks(json['tasks'] ?? json['checklist']),
         lastServiceDate: json['lastServiceDate']?.toString(),
       );
 

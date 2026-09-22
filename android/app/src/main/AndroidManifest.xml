@@ -1,6 +1,4 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-    <!-- AST-FR-07: QR stocktake camera -->
-    <uses-permission android:name="android.permission.CAMERA" />
     <application
         android:label="smart_asset_inventory"
         android:name="${applicationName}"

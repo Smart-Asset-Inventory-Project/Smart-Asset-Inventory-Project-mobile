@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import '../../core/l10n/strings.dart';
+import '../../core/services/asset_service.dart';
 import '../../core/services/template_service.dart';
+import '../../core/services/work_order_service.dart';
 import '../../models/maintenance_template_model.dart';
 
 /// AST-FR-05: عرض قوالب الصيانة + الاستحقاق القادم + checklist.
+/// Next due = آخر إكمال لأصل في فئة القالب + frequencyDays (S4).
 class TemplatesPage extends StatefulWidget {
   const TemplatesPage({super.key});
 
@@ -12,12 +15,32 @@ class TemplatesPage extends StatefulWidget {
 }
 
 class _TemplatesPageState extends State<TemplatesPage> {
-  late Future<List<MaintenanceTemplate>> _future;
+  late Future<(List<MaintenanceTemplate>, Map<String, DateTime>)> _future;
 
   @override
   void initState() {
     super.initState();
-    _future = TemplateService().fetchTemplates();
+    _future = _load();
+  }
+
+  /// آخر completedAt لكل categoryId من أوامر الشغل المغلقة.
+  Future<(List<MaintenanceTemplate>, Map<String, DateTime>)> _load() async {
+    final templates = await TemplateService().fetchTemplates();
+    final lastDone = <String, DateTime>{};
+    try {
+      final assets = await AssetService().fetchAssets();
+      final orders = await WorkOrderService().fetchWorkOrders(status: 'closed');
+      final catOf = {for (final a in assets) a.id: a.categoryId};
+      for (final w in orders) {
+        final cat = catOf[w.assetId];
+        if (cat == null || cat.isEmpty) continue;
+        final done = DateTime.tryParse(w.completedAt ?? '');
+        if (done == null) continue;
+        final prev = lastDone[cat];
+        if (prev == null || done.isAfter(prev)) lastDone[cat] = done;
+      }
+    } catch (_) {}
+    return (templates, lastDone);
   }
 
   Color _badge(String type) {
@@ -51,7 +74,7 @@ class _TemplatesPageState extends State<TemplatesPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: Text(tr(context, 'templates'))),
-      body: FutureBuilder<List<MaintenanceTemplate>>(
+      body: FutureBuilder<(List<MaintenanceTemplate>, Map<String, DateTime>)>(
         future: _future,
         builder: (context, snap) {
           if (snap.connectionState == ConnectionState.waiting) {
@@ -61,7 +84,8 @@ class _TemplatesPageState extends State<TemplatesPage> {
             return Center(
                 child: Text('${tr(context, 'error')}: ${snap.error}'));
           }
-          final items = snap.data ?? [];
+          final items = snap.data?.$1 ?? [];
+          final lastDone = snap.data?.$2 ?? {};
           if (items.isEmpty) {
             return Center(child: Text(tr(context, 'noTemplates')));
           }
@@ -71,7 +95,13 @@ class _TemplatesPageState extends State<TemplatesPage> {
             separatorBuilder: (_, __) => const SizedBox(height: 8),
             itemBuilder: (context, i) {
               final t = items[i];
-              final due = t.nextDue;
+              DateTime? done;
+              final catId = t.categoryId;
+              if (catId != null) done = lastDone[catId];
+              final due = done == null || t.intervalDays == null
+                  ? t.nextDue
+                  : done.add(Duration(days: t.intervalDays!));
+              final doneStr = done?.toIso8601String().substring(0, 10);
               return Card(
                 child: ExpansionTile(
                   leading: Icon(Icons.event_repeat_outlined,
@@ -80,6 +110,7 @@ class _TemplatesPageState extends State<TemplatesPage> {
                       style: const TextStyle(fontWeight: FontWeight.bold)),
                   subtitle: Text(
                     '${tr(context, t.category)} • ${_triggerText(context, t)}'
+                    '${doneStr == null ? '' : '\n${tr(context, 'completed')}: $doneStr'}'
                     '${due == null ? '' : '\n${tr(context, 'nextDue')}: ${due.toIso8601String().substring(0, 10)}'}',
                   ),
                   children: t.checklist

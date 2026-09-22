@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../core/constants/app_enums.dart';
 import '../../core/services/auth_service.dart';
-import '../../core/services/document_service.dart';
 import '../../core/services/procurement_service.dart';
 import '../../models/procurement_model.dart';
 import '../../models/user_model.dart';
@@ -68,34 +67,23 @@ class _ProcurementPageState extends State<ProcurementPage> {
             children: [
               _row('Supplier', info.supplier ?? '-'),
               _row('Purchase order', info.purchaseOrder ?? '-'),
+              _row('Order date', info.purchaseDate ?? '-'),
+              _row('Amount', info.purchaseAmount ?? '-'),
               _row('Invoice', info.invoiceId ?? '-'),
+              if (info.invoices.length > 1)
+                _row('All invoices', info.invoices.join(', ')),
+              const Divider(height: 24),
               _row('Warranty provider', info.warrantyProvider ?? '-'),
               _row('Warranty expiry', info.warrantyExpiry ?? '-'),
               _row('Warranty terms', info.warrantyTerms ?? '-'),
-              const Divider(height: 32),
-              const Text('Attachments (controlled access)',
-                  style: TextStyle(fontWeight: FontWeight.bold)),
-              const SizedBox(height: 8),
-              ...info.attachments.map((f) => ListTile(
-                    leading: const Icon(Icons.attach_file),
-                    title: Text(f),
-                    trailing: const Icon(Icons.download_outlined),
-                    onTap: () async {
-                      try {
-                        final url =
-                            await DocumentService().downloadUrl(f);
-                        if (!context.mounted) return;
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('Download URL: $url')),
-                        );
-                      } catch (e) {
-                        if (!context.mounted) return;
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text(e.toString())),
-                        );
-                      }
-                    },
-                  )),
+              if (info.supplier == null && info.warrantyProvider == null)
+                const Padding(
+                  padding: EdgeInsets.only(top: 16),
+                  child: Text(
+                    'No procurement records linked to this asset.',
+                    style: TextStyle(color: Colors.grey),
+                  ),
+                ),
             ],
           );
         },

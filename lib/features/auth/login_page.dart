@@ -316,9 +316,9 @@ class _LoginPageState extends State<LoginPage> {
           children: [
             // Top settings controls
             Positioned(
-              top: 8,
-              right: 16,
-              left: 16,
+              top: 0,
+              right: 8,
+              left: 8,
               child: AnimatedBuilder(
                 animation: appSettings,
                 builder: (context, _) => Row(
@@ -351,16 +351,25 @@ class _LoginPageState extends State<LoginPage> {
                       // Logo
                       Center(
                         child: Container(
-                          width: 120,
-                          height: 120,
+                          width: 130,
+                          height: 130,
                           decoration: BoxDecoration(
-                            color: Colors.blue.shade50,
-                            borderRadius: BorderRadius.circular(20),
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(24),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.08),
+                                blurRadius: 16,
+                                offset: const Offset(0, 6),
+                              ),
+                            ],
                           ),
-                          child: const Icon(
-                            Icons.inventory_2_outlined,
-                            size: 42,
-                            color: Colors.blue,
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(24),
+                            child: Image.asset(
+                              'assets/images/logo.png',
+                              fit: BoxFit.contain,
+                            ),
                           ),
                         ),
                       ),
@@ -406,7 +415,7 @@ class _LoginPageState extends State<LoginPage> {
                             return tr(context, 'enterEmail');
                           }
                           final emailRegex = RegExp(
-                            r'^[\w-\.]+@([\w-]+\.)+(com|net|org|edu|gov)$',
+                            r'^[\w\.-]+@([\w-]+\.)+[a-zA-Z]{2,}$',
                           );
                           if (!emailRegex.hasMatch(value.trim())) {
                             return tr(context, 'invalidEmail');

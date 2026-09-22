@@ -1,9 +1,11 @@
 import 'package:dio/dio.dart';
+import '../../models/retirement_model.dart';
 import '../constants/app_constants.dart';
 import 'api_service.dart';
+import 'auth_service.dart';
 
-/// AST-FR-10: تقاعد مضبوط بسبب واعتماد وتاريخ ودليل.
-/// المتقاعد read-only ويبقى في التقارير؛ لا حذف.
+/// AST-FR-10: تقاعد حقيقي.
+/// POST /retirements {assetId, reason} + GET /retirements للقوائم.
 class RetirementService {
   RetirementService({ApiService? api}) : _api = api ?? ApiService.instance;
   final ApiService _api;
@@ -15,18 +17,36 @@ class RetirementService {
   }) async {
     try {
       await _api.post(
-        '${AppConstants.assetsEndpoint}/$assetId/retire',
+        AppConstants.retirementsEndpoint,
         data: {
+          'assetId': assetId,
           'reason': reason,
-          if (evidence != null) 'evidence': evidence,
+          if (evidence != null && evidence.isNotEmpty) 'evidence': evidence,
         },
       );
     } on DioException catch (e) {
       if (AppConstants.allowMockFallback && e.response == null) {
         return; // mock accept
       }
-      final msg = e.response?.data?['message']?.toString() ?? 'Retire failed';
-      throw Exception(msg);
+      throw Exception(AuthService.backendMessage(e, 'Retire failed'));
+    }
+  }
+
+  Future<List<RetirementInfo>> fetchRetirements() async {
+    try {
+      final res = await _api.get(AppConstants.retirementsEndpoint,
+          query: const {'limit': '200'});
+      final body = Map<String, dynamic>.from(res.data as Map);
+      return ((body['data'] as List? ?? []))
+          .map((e) => RetirementInfo.fromJson(
+              Map<String, dynamic>.from(e as Map)))
+          .toList();
+    } on DioException catch (e) {
+      if ((AppConstants.allowMockFallback && e.response == null) ||
+          e.response?.statusCode == 404) {
+        return [];
+      }
+      rethrow;
     }
   }
 }

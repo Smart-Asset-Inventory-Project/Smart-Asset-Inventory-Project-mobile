@@ -11,18 +11,25 @@ class TemplateService {
   Future<List<MaintenanceTemplate>> fetchTemplates({String? category}) async {
     try {
       final res = await _api.get(
-        '${AppConstants.workOrdersEndpoint}/templates',
-        query: {if (category != null) 'category': category},
+        AppConstants.maintenanceTemplatesEndpoint,
+        query: const {'limit': '200'},
       );
-      final raw = res.data is List
-          ? res.data as List
-          : (res.data['data'] as List? ?? []);
-      return raw
+      final body = Map<String, dynamic>.from(res.data as Map);
+      var list = ((body['data'] as List? ?? []))
           .map((e) => MaintenanceTemplate.fromJson(
               Map<String, dynamic>.from(e as Map)))
           .toList();
+      if (category != null && category != 'all') {
+        list = list
+            .where((t) =>
+                t.category == category || t.categoryId == category)
+            .toList();
+      }
+      return list;
     } on DioException catch (e) {
-      if (AppConstants.allowMockFallback && e.response == null) {
+      // لا endpoint بديل: mock عند غياب السيرفر أو 404.
+      if ((AppConstants.allowMockFallback && e.response == null) ||
+          e.response?.statusCode == 404) {
         return _mock(category);
       }
       rethrow;

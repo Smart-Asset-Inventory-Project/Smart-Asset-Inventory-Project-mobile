@@ -11,11 +11,10 @@ class LocationService {
 
   Future<List<LocationModel>> fetchLocations() async {
     try {
-      final res = await _api.get(AppConstants.locationsEndpoint);
-      final raw = res.data is List
-          ? res.data as List
-          : (res.data['data'] as List? ?? []);
-      return raw
+      final res = await _api.get(AppConstants.locationsEndpoint,
+          query: const {'limit': '200'});
+      final body = Map<String, dynamic>.from(res.data as Map);
+      return ((body['data'] as List? ?? []))
           .map((e) =>
               LocationModel.fromJson(Map<String, dynamic>.from(e as Map)))
           .toList();
@@ -25,6 +24,22 @@ class LocationService {
       }
       rethrow;
     }
+  }
+
+  /// كل ids النطاق: نفسه + كل ما تحته في الهرم عبر parentId.
+  /// أساس Scope-Based للكاستوديان من scopeLocationId.
+  static Set<String> subtreeIds(List<LocationModel> all, String scopeId) {
+    final ids = <String>{scopeId};
+    var grew = true;
+    while (grew) {
+      grew = false;
+      for (final l in all) {
+        if (l.parentId != null && ids.contains(l.parentId) && ids.add(l.id)) {
+          grew = true;
+        }
+      }
+    }
+    return ids;
   }
 
   /// Synthetic فقط: مبنيان بكل المستويات.

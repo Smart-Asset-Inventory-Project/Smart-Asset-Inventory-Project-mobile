@@ -72,6 +72,7 @@ import 'package:flutter/material.dart';
 import '../../core/l10n/strings.dart';
 import '../../core/services/insights_service.dart';
 import '../../models/work_order_model.dart';
+import '../maintenance/create_work_order_page.dart';
 
 /// AST-FR-09:
 /// طابور المخاطر للعرض فقط مع الأسباب.
@@ -284,6 +285,32 @@ class _RiskQueuePageState extends State<RiskQueuePage> {
                 ),
 
                 isThreeLine: true,
+
+                trailing: ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    backgroundColor: Colors.blue.shade50,
+                    foregroundColor: Colors.blue.shade800,
+                    elevation: 0,
+                  ),
+                  icon: const Icon(Icons.build_outlined, size: 16),
+                  label: Text(
+                    tr(context, 'workOrder'),
+                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                  ),
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => CreateWorkOrderPage(
+                          presetAssetId: r.assetId,
+                          presetAssetTag: r.assetTag,
+                          initialNotes: 'Preventive service: ${r.reasons.join(', ')}',
+                        ),
+                      ),
+                    );
+                  },
+                ),
               );
             },
           );
