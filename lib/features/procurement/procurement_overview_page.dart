@@ -28,11 +28,19 @@ class _ProcurementOverviewPageState extends State<ProcurementOverviewPage> {
       (List<PurchaseOrderInfo>, List<InvoiceInfo>, List<WarrantyInfo>,
           List<SupplierInfo>)> _load() async {
     final svc = ProcurementService();
-    final pos = await svc.fetchPurchaseOrders();
-    final invs = await svc.fetchInvoices();
-    final wars = await svc.fetchWarranties();
-    final sups = await svc.fetchSuppliers();
-    return (pos, invs, wars, sups);
+    // Parallel: 1 round instead of 4 sequential.
+    final results = await Future.wait([
+      svc.fetchPurchaseOrders(),
+      svc.fetchInvoices(),
+      svc.fetchWarranties(),
+      svc.fetchSuppliers(),
+    ]);
+    return (
+      results[0] as List<PurchaseOrderInfo>,
+      results[1] as List<InvoiceInfo>,
+      results[2] as List<WarrantyInfo>,
+      results[3] as List<SupplierInfo>
+    );
   }
 
   @override

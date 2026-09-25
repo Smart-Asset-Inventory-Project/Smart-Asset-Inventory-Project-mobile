@@ -25,11 +25,23 @@ class _TemplatesPageState extends State<TemplatesPage> {
 
   /// آخر completedAt لكل categoryId من أوامر الشغل المغلقة.
   Future<(List<MaintenanceTemplate>, Map<String, DateTime>)> _load() async {
-    final templates = await TemplateService().fetchTemplates();
+    // Parallel: templates + assets + closed orders in one round.
+    final templatesFuture = TemplateService().fetchTemplates();
+    final assetsFuture =
+        AssetService().fetchAssets().then((v) => v, onError: (_) => []);
+    final ordersFuture = WorkOrderService()
+        .fetchWorkOrders(status: 'closed')
+        .then((v) => v, onError: (_) => []);
+    final results = await Future.wait([
+      templatesFuture,
+      assetsFuture,
+      ordersFuture,
+    ]);
+    final templates = results[0] as List<MaintenanceTemplate>;
     final lastDone = <String, DateTime>{};
     try {
-      final assets = await AssetService().fetchAssets();
-      final orders = await WorkOrderService().fetchWorkOrders(status: 'closed');
+      final assets = results[1] as List;
+      final orders = results[2] as List;
       final catOf = {for (final a in assets) a.id: a.categoryId};
       for (final w in orders) {
         final cat = catOf[w.assetId];

@@ -19,7 +19,7 @@ class DocumentService {
       if (e.response?.statusCode == 403) {
         throw Exception('Access denied: procurement permission required');
       }
-      if (AppConstants.allowMockFallback && e.response == null) {
+      if (AppConstants.allowMockFallback) {
         return '${AppConstants.baseUrl}/mock-docs/$filename';
       }
       rethrow;

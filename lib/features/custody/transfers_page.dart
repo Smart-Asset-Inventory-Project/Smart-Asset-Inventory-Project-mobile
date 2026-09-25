@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../core/l10n/strings.dart';
 import '../../core/services/location_service.dart';
+import '../../core/services/transfer_outbox.dart';
 import '../../core/services/transfer_service.dart';
 import '../../core/services/user_directory.dart';
 import '../../core/widgets/role_gate.dart';
@@ -10,7 +11,12 @@ import 'request_transfer_page.dart';
 /// AST-FR-04: سجل النقل + تسجيل نقل جديد.
 /// الباك اند يسجل النقل فوريا (completed) بلا اعتماد.
 class TransfersPage extends StatefulWidget {
-  const TransfersPage({super.key});
+  /// Scope-Based: الكاستوديان يرى نقل نطاقه فقط.
+  final String? scopeLocationId;
+
+  /// Deep link from dashboard cards: 'pending' shows pending only.
+  final String? initialStatus;
+  const TransfersPage({super.key, this.scopeLocationId, this.initialStatus});
 
   @override
   State<TransfersPage> createState() => _TransfersPageState();
@@ -18,16 +24,43 @@ class TransfersPage extends StatefulWidget {
 
 class _TransfersPageState extends State<TransfersPage> {
   late Future<(List<TransferModel>, Map<String, String>)> _future;
+  late String _status;
 
   @override
   void initState() {
     super.initState();
+    _status = widget.initialStatus ?? 'all';
     _future = _load();
   }
 
   Future<(List<TransferModel>, Map<String, String>)> _load() async {
-    final items = await TransferService().fetchTransfers();
+    // Parallel: transfers + locations in one round.
+    final backend = await TransferService().fetchTransfers(
+      scopeLocationId: widget.scopeLocationId,
+      status: _status == 'all' ? null : _status,
+    );
+    // Device-kept requests (backend refused them): always pending.
+    final outbox = await TransferOutbox.load();
+    final local = outbox
+        .map((o) => TransferModel(
+              id: o.id,
+              assetId: o.assetId,
+              assetTag: o.assetId,
+              fromLocation: '-',
+              toLocation: o.toLocationId,
+              status: 'pending',
+              requestedBy: 'this device',
+              requestedAt: o.createdAt,
+              reason: o.reason,
+            ))
+        .toList();
+    var items = <TransferModel>[...local, ...backend];
+    if (_status != 'all') {
+      items = items.where((t) => t.status == _status).toList();
+    }
     var locNames = <String, String>{};
+    // Locations best-effort in parallel with nothing else pending;
+    // fetchLocations is already fast single call.
     try {
       final locs = await LocationService().fetchLocations();
       locNames = {for (final l in locs) l.id: l.name};
@@ -35,7 +68,45 @@ class _TransfersPageState extends State<TransfersPage> {
     return (items, locNames);
   }
 
-  void _reload() => setState(() => _future = _load());
+  bool _isLocal(TransferModel t) => t.id.startsWith('local-');
+
+  Future<void> _retryLocal(TransferModel t) async {
+    final entries = await TransferOutbox.load();
+    final match = entries.where((e) => e.id == t.id).toList();
+    if (match.isEmpty) return;
+    final o = match.first;
+    try {
+      await TransferService().requestTransfer(
+        assetId: o.assetId,
+        toLocation: o.toLocationId,
+        reason: o.reason,
+      );
+      await TransferOutbox.remove(o.id);
+      if (!mounted) return;
+      setState(() {
+        _status = 'all';
+        _future = _load();
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Transfer sent')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+            content:
+                Text(e.toString().replaceFirst('Exception: ', ''))),
+      );
+    }
+  }
+
+  Future<void> _discardLocal(TransferModel t) async {
+    await TransferOutbox.remove(t.id);
+    if (!mounted) return;
+    setState(() {
+      _future = _load();
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -50,14 +121,52 @@ class _TransfersPageState extends State<TransfersPage> {
               context,
               MaterialPageRoute(builder: (_) => const RequestTransferPage()),
             );
-            if (ok == true) _reload();
+            // Backend completes transfers immediately (no pending state),
+            // so a sent request is hidden under the Pending filter —
+            // jump back to All so the user sees it. A device-kept
+            // request ('local') lands on Pending instead.
+            if (ok == 'local') {
+              setState(() {
+                _status = 'pending';
+                _future = _load();
+              });
+            } else if (ok == true) {
+              setState(() {
+                _status = 'all';
+                _future = _load();
+              });
+            }
           },
         ),
       ),
       body: Stack(
         children: [
-          FutureBuilder<(List<TransferModel>, Map<String, String>)>(
-            future: _future,
+          Column(
+            children: [
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.all(12),
+                child: Row(
+                  children: ['all', 'pending', 'completed']
+                      .map((s) => Padding(
+                            padding: const EdgeInsets.only(right: 8),
+                            child: ChoiceChip(
+                              label: Text(tr(context, s)),
+                              selected: _status == s,
+                              onSelected: (_) {
+                                setState(() {
+                                  _status = s;
+                                  _future = _load();
+                                });
+                              },
+                            ),
+                          ))
+                      .toList(),
+                ),
+              ),
+              Expanded(
+                child: FutureBuilder<(List<TransferModel>, Map<String, String>)>(
+                  future: _future,
             builder: (context, snap) {
               if (snap.connectionState == ConnectionState.waiting) {
                 return const Center(child: CircularProgressIndicator());
@@ -169,6 +278,43 @@ class _TransfersPageState extends State<TransfersPage> {
                                   fontStyle: FontStyle.italic),
                             ),
                           ],
+                          // Device-kept request: not on the server yet.
+                          if (_isLocal(t)) ...[
+                            const SizedBox(height: 8),
+                            Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 8, vertical: 6),
+                              decoration: BoxDecoration(
+                                color: Colors.orange.withValues(alpha: 0.1),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: const Text(
+                                'On this device • not sent (no permission)',
+                                style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.orange),
+                              ),
+                            ),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.end,
+                              children: [
+                                TextButton(
+                                  onPressed: () => _discardLocal(t),
+                                  child: const Text('Discard',
+                                      style:
+                                          TextStyle(color: Colors.grey)),
+                                ),
+                                TextButton.icon(
+                                  icon: const Icon(Icons.send_outlined,
+                                      size: 16),
+                                  label: const Text('Retry send'),
+                                  onPressed: () => _retryLocal(t),
+                                ),
+                              ],
+                            ),
+                          ],
                         ],
                       ),
                     ),
@@ -176,6 +322,9 @@ class _TransfersPageState extends State<TransfersPage> {
                 },
               );
             },
+          ),
+              ),
+            ],
           ),
         ],
       ),

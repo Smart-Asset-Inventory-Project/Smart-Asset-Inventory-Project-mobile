@@ -28,6 +28,8 @@ class WorkOrderModel {
     switch (s.toUpperCase().replaceAll('_', '')) {
       case 'OPEN':
         return 'open';
+      case 'ASSIGNED':
+        return 'assigned';
       case 'INPROGRESS':
         return 'inProgress';
       case 'COMPLETED':

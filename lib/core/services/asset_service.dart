@@ -17,13 +17,22 @@ class AssetService {
     String? locationId,
     String? category,
     String? scopeLocationId,
+    String? status,
+    String? condition,
+    String? categoryId,
   }) async {
     try {
-      // limit كبير لأن الباك اند يصفح (20 افتراضيا).
-      // الفلترة client-side لضمان السلوك مهما دعم السيرفر.
+      // Docs max limit 100. Server-side filters first, client-side as backup.
       final res = await _api.get(
         AppConstants.assetsEndpoint,
-        query: const {'limit': '200'},
+        query: {
+          'limit': '${AppConstants.pageSize}',
+          if (query != null && query.isNotEmpty) 'search': query,
+          if (status != null && status.isNotEmpty) 'status': status,
+          if (condition != null && condition.isNotEmpty) 'condition': condition,
+          if (categoryId != null && categoryId.isNotEmpty) 'categoryId': categoryId,
+          if (locationId != null && locationId.isNotEmpty) 'locationId': locationId,
+        },
       );
       final body = res.data as Map;
       final raw = (body['data'] as List? ?? []);
@@ -63,8 +72,8 @@ class AssetService {
             .toList();
       }
       return list;
-    } on DioException catch (e) {
-      if (AppConstants.allowMockFallback && e.response == null) {
+    } on DioException catch (_) {
+      if (AppConstants.allowMockFallback) {
         return _mockAssets(
             query: query, category: category, locationId: locationId);
       }
@@ -77,8 +86,8 @@ class AssetService {
       final res = await _api.get('${AppConstants.assetsEndpoint}/$id');
       final data = res.data is Map ? res.data['data'] ?? res.data : {};
       return AssetModel.fromJson(Map<String, dynamic>.from(data as Map));
-    } on DioException catch (e) {
-      if (AppConstants.allowMockFallback && e.response == null) {
+    } on DioException catch (_) {
+      if (AppConstants.allowMockFallback) {
         return _mockAssets().firstWhere((a) => a.id == id,
             orElse: () => _mockAssets().first);
       }
@@ -86,16 +95,17 @@ class AssetService {
     }
   }
 
-  /// PUT /assets/:id لتعديل أصل. رسالة الخطأ من السيرفر.
+  /// PUT /assets/:id لتعديل أصل. Partial update — نفس تنظيف الإنشاء.
   Future<AssetModel> updateAsset(String id, Map<String, dynamic> payload) async {
+    final data = _cleanAssetPayload(payload);
     try {
       final res = await _api.put('${AppConstants.assetsEndpoint}/$id',
-          data: payload);
+          data: data);
       final body = Map<String, dynamic>.from(res.data as Map);
       return AssetModel.fromJson(
           Map<String, dynamic>.from(body['data'] as Map));
     } on DioException catch (e) {
-      if (AppConstants.allowMockFallback && e.response == null) {
+      if (AppConstants.allowMockFallback) {
         return AssetModel.fromJson({
           'id': id,
           'assetTag': payload['assetTag'],
@@ -117,21 +127,49 @@ class AssetService {
     try {
       await _api.dio.delete('${AppConstants.assetsEndpoint}/$id');
     } on DioException catch (e) {
-      if (AppConstants.allowMockFallback && e.response == null) return;
+      if (AppConstants.allowMockFallback) return;
       throw Exception(AuthService.backendMessage(e, 'Delete failed'));
     }
   }
+  /// Docs: money as JSON numbers (omit when unknown — never send null),
+  /// null only for unknown serialNumber, omit empty optional links.
+  /// Non-contract keys (brand, tag/serial/category aliases) are stripped.
+  static Map<String, dynamic> _cleanAssetPayload(
+      Map<String, dynamic> payload) {
+    final data = Map<String, dynamic>.from(payload)
+      ..remove('tag')
+      ..remove('serial')
+      ..remove('category')
+      ..remove('brand');
+    final serial =
+        (data['serialNumber'] ?? payload['serialNumber'] ?? payload['serial'])
+            ?.toString()
+            .trim();
+    data['serialNumber'] =
+        (serial == null || serial.isEmpty) ? null : serial;
+    for (final k in ['categoryId', 'locationId']) {
+      final v = data[k]?.toString().trim() ?? '';
+      if (v.isEmpty) data.remove(k);
+    }
+    for (final k in ['model', 'purchaseCost', 'usefulLifeYears', 'value']) {
+      final v = data[k];
+      if (v == null || (v is String && v.trim().isEmpty)) data.remove(k);
+    }
+    return data;
+  }
+
   /// assetTag, name, categoryId, locationId. رسالة الخطأ من السيرفر.
   /// AST-FR-02: إنشاء أصل. الحقول المطلوبة في الباك اند:
   /// assetTag, name, categoryId, locationId. رسالة الخطأ من السيرفر.
   Future<AssetModel> createAsset(Map<String, dynamic> payload) async {
+    final data = _cleanAssetPayload(payload);
     try {
-      final res = await _api.post(AppConstants.assetsEndpoint, data: payload);
+      final res = await _api.post(AppConstants.assetsEndpoint, data: data);
       final body = Map<String, dynamic>.from(res.data as Map);
       return AssetModel.fromJson(
           Map<String, dynamic>.from(body['data'] as Map));
     } on DioException catch (e) {
-      if (AppConstants.allowMockFallback && e.response == null) {
+      if (AppConstants.allowMockFallback) {
         // mock accept محلي للاختبارات فقط
         return AssetModel.fromJson({
           'id': 'mock-${DateTime.now().millisecondsSinceEpoch}',
@@ -148,6 +186,20 @@ class AssetService {
       }
       throw Exception(
           AuthService.backendMessage(e, 'Create failed'));
+    }
+  }
+
+  /// GET /assets/{id}/history — transfers/custody/service audit trail.
+  Future<List<Map<String, dynamic>>> fetchAssetHistory(String id) async {
+    try {
+      final res = await _api.get('${AppConstants.assetsEndpoint}/$id/history');
+      final body = Map<String, dynamic>.from(res.data as Map);
+      return ((body['data'] as List? ?? []))
+          .map((e) => Map<String, dynamic>.from(e as Map))
+          .toList();
+    } on DioException catch (_) {
+      if (AppConstants.allowMockFallback) return [];
+      rethrow;
     }
   }
 

@@ -84,6 +84,8 @@ const Map<String, String> _en = {
   'medium': 'Medium',
   'low': 'Low',
   'open': 'Open',
+  'assigned': 'Assigned',
+  'due': 'Due',
   'closed': 'Closed',
   'completed': 'Completed',
   'cancelled': 'Cancelled',
@@ -174,6 +176,8 @@ const Map<String, String> _en = {
   'purchaseOrders': 'Purchase Orders',
   'invoices': 'Invoices',
   'warranties': 'Warranties',
+  'timeoutRetry': 'Server timeout (waking up) — try again',
+  'noInternet': 'No connection — check internet and try again',
 };
 
 const Map<String, String> _ar = {
@@ -259,6 +263,8 @@ const Map<String, String> _ar = {
   'medium': 'متوسطة',
   'low': 'منخفضة',
   'open': 'مفتوح',
+  'assigned': 'مُسند',
+  'due': 'مستحق',
   'closed': 'مغلق',
   'completed': 'مكتمل',
   'cancelled': 'ملغي',
@@ -349,6 +355,8 @@ const Map<String, String> _ar = {
   'purchaseOrders': 'أوامر الشراء',
   'invoices': 'الفواتير',
   'warranties': 'الضمانات',
+  'timeoutRetry': 'مهلة السيرفر (يستيقظ) — حاول مجددا',
+  'noInternet': 'لا يوجد اتصال — تحقق من الإنترنت وحاول مجددا',
 };
 
 String tr(BuildContext context, String key) {

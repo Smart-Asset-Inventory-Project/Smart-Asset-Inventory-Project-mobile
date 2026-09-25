@@ -1,10 +1,13 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:smart_asset_inventory/core/constants/app_constants.dart';
 import 'package:smart_asset_inventory/core/services/auth_service.dart';
 import 'package:smart_asset_inventory/core/services/asset_service.dart';
 
 /// اختبار عقد حي ضد الباك اند. يحتاج إنترنت. يتخطى تلقائيا بدونه.
+/// mock مطفأ عمدا هنا: هذا الاختبار يتحقق من الباك الحقيقي فقط.
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+  AppConstants.allowMockFallback = false;
 
   test('live backend contract: login + assets', () async {
     try {

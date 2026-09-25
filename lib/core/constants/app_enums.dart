@@ -33,4 +33,4 @@ enum AssetStatus { active, inMaintenance, retired, unknown }
 enum TransferStatus { pending, approved, rejected, unknown }
 
 enum WorkOrderStatus { open, inProgress, closed, cancelled, unknown }
-// عملت lib/core/constants/app_enums.dart للادوار admin/procurement/custodian/technician/auditor.
+// عملت lib/core/constants/app_enums.dart Admin@123للادوار admin/procurement/custodian/technician/auditor.

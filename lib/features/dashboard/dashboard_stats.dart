@@ -3,13 +3,21 @@ import '../../core/theme/app_colors.dart';
 import '../../core/constants/app_enums.dart';
 import '../../core/l10n/strings.dart';
 import '../../core/services/asset_service.dart';
+import '../../core/services/auth_service.dart';
 import '../../core/services/insights_service.dart';
 import '../../core/services/transfer_service.dart';
 import '../../core/services/work_order_service.dart';
 import '../../models/transfer_model.dart';
+import '../../models/asset_model.dart';
 import '../../models/user_model.dart';
 import '../../models/work_order_model.dart';
-import '../../core/services/catalog_service.dart' show DashboardApi;
+import '../../core/services/location_service.dart';
+import '../../core/services/retirement_service.dart';
+import '../../core/services/custody_service.dart';
+import '../../core/services/transfer_outbox.dart';
+import '../../models/custody_model.dart';
+import '../../models/retirement_model.dart';
+import '../../core/services/catalog_service.dart' show DashboardApi, DashboardSummary;
 import '../assets/assets_list_page.dart';
 import '../custody/transfers_page.dart';
 import '../maintenance/work_orders_page.dart';
@@ -24,7 +32,14 @@ class DashboardStats extends StatefulWidget {
 
   /// معاينة ديمو للدور. null = دور المستخدم الحقيقي.
   final UserRole? roleOverride;
-  const DashboardStats({super.key, this.user, this.roleOverride});
+
+  /// Shared load from DashboardPage. null = load own (backward compat).
+  final Future<DashboardData>? future;
+
+  /// Page-level reload (pull-to-refresh) for the error card Retry.
+  final Future<void> Function()? onRetry;
+  const DashboardStats(
+      {super.key, this.user, this.roleOverride, this.future, this.onRetry});
 
   @override
   State<DashboardStats> createState() => _DashboardStatsState();
@@ -42,6 +57,7 @@ class DashboardData {
   int open = 0;
   int inProgress = 0;
   int closed = 0;
+  int totalOrders = 0;
   int pendingTransfers = 0;
   int allTransfers = 0;
   int myAssets = 0;
@@ -58,9 +74,18 @@ class DashboardData {
   int pendingToMe = 0;
   Map<String, int> byCategory = {};
   Map<String, double> valueByCategory = {};
+  Map<String, int> byCondition = {};
+  Map<String, int> byLocation = {};
   List<TransferModel> recentTransfers = [];
   List<WorkOrderModel> todayQueue = [];
   List<WorkOrderModel> recentClosed = [];
+  int retirementRequests = 0;
+  List<RetirementInfo> recentRetirements = [];
+
+  /// True custody: active assignments ∪ asset.custodianId matches.
+  /// null = unknown (no filter); empty = genuinely none (shows empty).
+  Set<String>? myAssetIds;
+  Set<String>? scopeAssetIds;
 }
 
 String normAssetStatus(String s) {
@@ -80,20 +105,78 @@ DateTime? _day(String? iso) {
 }
 
 /// المصدر الوحيد لبيانات الداشبورد (stats + sections).
+/// includeCustody يضيف جلب العهد النشطة لحساب أصول الكاستوديان الحقيقية
+/// (سجلات العهدة أدق من حقل custodianId وحده).
 Future<DashboardData> loadDashboardData(
-    {String? userId, String? scopeLocationId}) async {
+    {String? userId, String? scopeLocationId, bool includeCustody = false}) async {
   final s = DashboardData();
-  final assets = await AssetService().fetchAssets(
-    scopeLocationId: scopeLocationId,
-  );
-  var orders = await WorkOrderService().fetchWorkOrders();
+  // Parallel: 1 round-trip instead of 4 sequential Vercel calls.
+  // Locations ride along (cached) for by-location breakdown names.
+  final wantCustody = includeCustody && userId != null && userId.isNotEmpty;
+  // Assets + orders are the core: their failure fails the load (with UI
+  // retry). Transfers/summary/locations/retirements/custody degrade to
+  // empty so one struggling endpoint can't blank the whole dashboard.
+  Future<List<dynamic>> batch() => Future.wait([
+        AssetService().fetchAssets(scopeLocationId: scopeLocationId),
+        WorkOrderService().fetchWorkOrders(),
+        TransferService()
+            .fetchTransfers(scopeLocationId: scopeLocationId)
+            .then<List<TransferModel>>((v) => v,
+                onError: (_) => <TransferModel>[]),
+        DashboardApi()
+            .fetchSummary()
+            .then<DashboardSummary?>((v) => v, onError: (_) => null),
+        LocationService()
+            .fetchLocations()
+            .then<List<LocationModel>>((v) => v,
+                onError: (_) => <LocationModel>[]),
+        RetirementService()
+            .fetchRetirements()
+            .then<List<RetirementInfo>>((v) => v,
+                onError: (_) => <RetirementInfo>[]),
+        if (wantCustody)
+          CustodyService()
+              .fetchAssignments(active: true)
+              .then<List<CustodyAssignment>>((v) => v,
+                  onError: (_) => <CustodyAssignment>[]),
+      ]);
+  // One automatic retry: Vercel cold starts / flakes often succeed second.
+  late final List<dynamic> results;
+  try {
+    results = await batch();
+  } catch (_) {
+    await Future.delayed(const Duration(milliseconds: 1500));
+    results = await batch();
+  }
+  final assets = results[0] as List<AssetModel>;
+  var orders = results[1] as List<WorkOrderModel>;
+  final transfers = results[2] as List<TransferModel>;
+  final summary = results[3] as DashboardSummary?;
+  final locNames = {
+    for (final l in results[4] as List<LocationModel>) l.id: l.name
+  };
+  final retirements = results[5] as List<RetirementInfo>;
+  final myAssign = results.length > 6
+      ? results[6] as List<CustodyAssignment>
+      : <CustodyAssignment>[];
+  // Union: assignments pointing at me + asset form field pointing at me.
+  final mine = <String>{
+    for (final c in myAssign)
+      if (c.userId == userId) c.assetId,
+    for (final a in assets)
+      if (userId != null && a.custodianId == userId) a.id,
+  };
+  s.myAssetIds = mine;
+  if (scopeLocationId != null && scopeLocationId.isNotEmpty) {
+    s.scopeAssetIds = assets.map((a) => a.id).toSet();
+  }
   // Scope-Based: أوامر أصول النطاق فقط للكاستوديان.
   if (scopeLocationId != null && scopeLocationId.isNotEmpty) {
     final ids = assets.map((a) => a.id).toSet();
     orders = orders.where((w) => ids.contains(w.assetId)).toList();
   }
-  final risks = await InsightsService().fetchRiskQueue();
-  final transfers = await TransferService().fetchTransfers();
+  // Risk from already-fetched lists — no refetch (was doubling requests).
+  final risks = InsightsService.buildRisk(assets, orders);
   final today = DateTime.now();
   final todayDay = DateTime(today.year, today.month, today.day);
 
@@ -117,8 +200,12 @@ Future<DashboardData> loadDashboardData(
     s.byCategory[a.category] = (s.byCategory[a.category] ?? 0) + 1;
     s.valueByCategory[a.category] =
         (s.valueByCategory[a.category] ?? 0) + (a.purchaseCost ?? 0);
+    final cond = a.condition.isEmpty ? '-' : a.condition;
+    s.byCondition[cond] = (s.byCondition[cond] ?? 0) + 1;
+    final locName = locNames[a.locationId] ?? a.locationId;
+    s.byLocation[locName] = (s.byLocation[locName] ?? 0) + 1;
     if (userId != null &&
-        a.custodianId == userId &&
+        mine.contains(a.id) &&
         a.condition.toLowerCase() != 'good') {
       s.myNeedsAttention++;
     }
@@ -143,25 +230,22 @@ Future<DashboardData> loadDashboardData(
     }
   }
   s.due = s.open + s.inProgress;
+  s.totalOrders = orders.length;
   // إجماليات السيرفر الكاملة من /dashboard/summary (تغطي ما بعد limit).
   // تُطبق فقط بدون scope: الكاستوديان يرى نطاقه المحسوب محليا.
+  // summary جُلب بالتوازي أعلاه — لا request إضافي هنا.
   if (scopeLocationId == null || scopeLocationId.isEmpty) {
-    try {
-      final summary = await DashboardApi().fetchSummary();
-      if (summary != null) {
-        s.total = summary.totalAssets;
-        s.active = summary.activeAssets;
-        s.inRepair = summary.maintenanceAssets;
-        s.retired = summary.retiredAssets;
-        s.open = summary.openWorkOrders;
-        s.overdue = summary.overdueWorkOrders;
-        s.dueSoon = summary.dueSoonWorkOrders;
-        s.due = s.open + s.inProgress;
-        s.value = summary.totalValue;
-        s.expiringWarranties = summary.expiringWarranties30d;
-      }
-    } catch (_) {
-      // يبقى المحسوب محليا
+    if (summary != null) {
+      s.total = summary.totalAssets;
+      s.active = summary.activeAssets;
+      s.inRepair = summary.maintenanceAssets;
+      s.retired = summary.retiredAssets;
+      s.open = summary.openWorkOrders;
+      s.overdue = summary.overdueWorkOrders;
+      s.dueSoon = summary.dueSoonWorkOrders;
+      s.due = s.open + s.inProgress;
+      s.value = summary.totalValue;
+      s.expiringWarranties = summary.expiringWarranties30d;
     }
   }
   s.high = risks.where((r) => r.band == 'high').length;
@@ -169,38 +253,74 @@ Future<DashboardData> loadDashboardData(
   s.low = risks.where((r) => r.band == 'low').length;
   s.pendingTransfers = transfers.where((t) => t.status == 'pending').length;
   s.allTransfers = transfers.length;
-  s.pendingToMe = userId == null
-      ? 0
-      : transfers
-          .where((t) => t.status == 'pending' && t.toCustodian == userId)
-          .length;
+  // Device-kept requests (backend refused them) count as pending too —
+  // same set the Pending tab shows, so outside matches inside.
+  try {
+    final box = await TransferOutbox.load();
+    if (box.isNotEmpty) {
+      var mine = box.length;
+      if (scopeLocationId != null && scopeLocationId.isNotEmpty) {
+        final locs = results[4] as List<LocationModel>;
+        final scope = LocationService.subtreeIds(locs, scopeLocationId);
+        mine = box.where((o) => scope.contains(o.toLocationId)).length;
+      }
+      s.pendingTransfers += mine;
+      s.pendingToMe = userId == null
+          ? mine
+          : transfers
+                  .where((t) =>
+                      t.status == 'pending' && t.toCustodian == userId)
+                  .length +
+              mine;
+    } else {
+      s.pendingToMe = userId == null
+          ? 0
+          : transfers
+              .where(
+                  (t) => t.status == 'pending' && t.toCustodian == userId)
+              .length;
+    }
+  } catch (_) {
+    s.pendingToMe = userId == null
+        ? 0
+        : transfers
+            .where((t) => t.status == 'pending' && t.toCustodian == userId)
+            .length;
+  }
   s.myAssets = userId == null
       ? 0
-      : scopeLocationId != null && scopeLocationId.isNotEmpty
-          // Scope-Based: أصول النطاق كله بدل عهدة المستخدم فقط
-          ? assets.length
-          : assets.where((a) => a.custodianId == userId).length;
+      : mine.length;
   s.recentTransfers = transfers.take(4).toList();
   s.recentClosed =
       orders.where((w) => w.status == 'closed').take(3).toList();
+  s.retirementRequests = retirements.length;
+  s.recentRetirements = retirements.take(3).toList();
   return s;
 }
 
 class _DashboardStatsState extends State<DashboardStats> {
   late Future<DashboardData> _future;
 
+  Future<DashboardData> _ownLoad() => loadDashboardData(
+      userId: widget.user?.id,
+      scopeLocationId:
+          _role == UserRole.custodian ? widget.user?.collegeScope : null,
+      includeCustody: _role == UserRole.custodian);
+
   @override
   void initState() {
     super.initState();
-    _future = loadDashboardData(userId: widget.user?.id, scopeLocationId: _role == UserRole.custodian ? widget.user?.collegeScope : null);
+    _future = widget.future ?? _ownLoad();
   }
 
   @override
   void didUpdateWidget(DashboardStats old) {
     super.didUpdateWidget(old);
-    if (old.user?.id != widget.user?.id ||
+    if (old.future != widget.future && widget.future != null) {
+      _future = widget.future!;
+    } else if (old.user?.id != widget.user?.id ||
         old.roleOverride != widget.roleOverride) {
-      _future = loadDashboardData(userId: widget.user?.id, scopeLocationId: _role == UserRole.custodian ? widget.user?.collegeScope : null);
+      _future = widget.future ?? _ownLoad();
     }
   }
 
@@ -212,6 +332,31 @@ class _DashboardStatsState extends State<DashboardStats> {
     return FutureBuilder<DashboardData>(
       future: _future,
       builder: (context, snap) {
+        // Error: show the reason + Retry instead of silent '…' cards.
+        if (snap.hasError) {
+          return Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    AuthService.friendlyError(snap.error!),
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(color: Colors.red),
+                  ),
+                  const SizedBox(height: 8),
+                  OutlinedButton(
+                    onPressed: widget.onRetry == null
+                        ? null
+                        : () => widget.onRetry!(),
+                    child: const Text('Retry'),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }
         final d = snap.data;
         final cards = _cardsFor(context, d);
         return Column(
@@ -264,42 +409,45 @@ class _DashboardStatsState extends State<DashboardStats> {
         return [
           _card(tr(context, 'myAssets'), v(d?.myAssets), Icons.person_outline,
               onTap: () => _go(AssetsListPage(
-                  scopeLocationId: widget.user?.collegeScope))),
+                  assetIds: d?.myAssetIds))),
           _card(tr(context, 'maintDue'), v(d?.due), Icons.build_outlined,
-              onTap: () => _go(const WorkOrdersPage())),
+              onTap: () =>
+                  _go(WorkOrdersPage(assetIds: d?.scopeAssetIds))),
           _card(tr(context, 'pendingTransfers'), v(d?.pendingTransfers),
               Icons.swap_horiz,
-              onTap: () => _go(const TransfersPage())),
+              onTap: () => _go(TransfersPage(
+                  scopeLocationId: widget.user?.collegeScope,
+                  initialStatus: 'pending'))),
           _card(tr(context, 'needsAttention'), v(d?.myNeedsAttention),
               Icons.report_problem_outlined,
               onTap: () => _go(AssetsListPage(
-                  scopeLocationId: widget.user?.collegeScope))),
+                  assetIds: d?.myAssetIds, attentionOnly: true))),
         ];
       case UserRole.technician:
+        final techId = widget.user?.id;
         return [
-          _card(tr(context, 'myOrders'), v(d?.myOpenOrders),
+          _card(tr(context, 'myOrders'), v(d?.totalOrders),
               Icons.assignment_ind_outlined,
               onTap: () =>
-                  _go(const WorkOrdersPage(initialStatus: 'open'))),
+                  _go(const WorkOrdersPage(initialStatus: 'all'))),
           _card(tr(context, 'dueToday'), v(d?.dueToday),
               Icons.today_outlined,
-              onTap: () => _go(const WorkOrdersPage())),
+              onTap: () => _go(WorkOrdersPage(
+                  initialStatus: 'due', assignedToUserId: techId))),
           _card(tr(context, 'overdue'), v(d?.overdue),
               Icons.warning_amber_outlined,
-              onTap: () => _go(const WorkOrdersPage())),
+              onTap: () => _go(WorkOrdersPage(
+                  initialStatus: 'overdue', assignedToUserId: techId))),
           _card(tr(context, 'completed'), v(d?.closed),
               Icons.check_circle_outline,
-              onTap: () =>
-                  _go(const WorkOrdersPage(initialStatus: 'closed'))),
+              onTap: () => _go(WorkOrdersPage(
+                  initialStatus: 'closed', assignedToUserId: techId))),
         ];
       case UserRole.auditor:
         return [
           _card(tr(context, 'totalAssets'), v(d?.total),
               Icons.inventory_2_outlined,
               onTap: () => _go(const AssetsListPage())),
-          _card(tr(context, 'assetValue'),
-              d == null ? '…' : '${d.value.toInt()}', Icons.attach_money,
-              onTap: () => _go(const ProcurementOverviewPage())),
           _card(tr(context, 'allTransfers'), v(d?.allTransfers), Icons.swap_horiz,
               onTap: () => _go(const TransfersPage())),
           _card(tr(context, 'closedOrders'), v(d?.closed), Icons.check_circle_outline,

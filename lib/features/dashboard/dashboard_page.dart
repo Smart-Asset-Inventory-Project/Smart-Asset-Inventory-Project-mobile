@@ -3,9 +3,9 @@ import 'package:smart_asset_inventory/core/theme/app_colors.dart';
 import '../../core/constants/app_enums.dart';
 import '../../core/l10n/strings.dart';
 import '../../core/services/auth_service.dart';
-import '../../core/theme/app_settings.dart';
 import '../../models/user_model.dart';
 import '../auth/login_page.dart';
+import '../settings/settings_page.dart';
 
 import '../assets/assets_list_page.dart';
 import '../categories/categories_page.dart';
@@ -21,7 +21,10 @@ import 'dashboard_sections.dart';
 import 'dashboard_stats.dart';
 
 class DashboardPage extends StatefulWidget {
-  const DashboardPage({super.key});
+  /// User from login — skips a sequential /auth/me round-trip.
+  /// null (e.g. tests) = fetch via AuthService as before.
+  final UserModel? user;
+  const DashboardPage({super.key, this.user});
 
   @override
   State<DashboardPage> createState() => _DashboardPageState();
@@ -30,10 +33,44 @@ class DashboardPage extends StatefulWidget {
 class _DashboardPageState extends State<DashboardPage> {
   UserModel? _user;
 
+  /// Single shared dashboard load — stats + sections + risk all reuse it.
+  /// Was 3 independent loads (~11 requests); now 1 parallel batch.
+  Future<DashboardData>? _dataFuture;
+
+  /// One shared batch for this role — custodian adds custody records.
+  Future<DashboardData> _batch(UserModel? u) => loadDashboardData(
+        userId: u?.id,
+        scopeLocationId:
+            u?.role == UserRole.custodian ? u?.collegeScope : null,
+        includeCustody: u?.role == UserRole.custodian,
+      );
+
   @override
   void initState() {
     super.initState();
-    _loadUser();
+    if (widget.user != null) {
+      // No waiting: data requests fire immediately alongside login-warm API.
+      _user = widget.user;
+      _dataFuture = _batch(_user);
+      _refreshUser();
+    } else {
+      _loadUser();
+    }
+  }
+
+  /// Background refresh of the cached user — never blocks data load.
+  Future<void> _refreshUser() async {
+    final u = await AuthService().currentUser();
+    if (!mounted) return;
+    if (u != null &&
+        (u.id != _user?.id ||
+            u.role != _user?.role ||
+            u.collegeScope != _user?.collegeScope)) {
+      setState(() {
+        _user = u;
+        _dataFuture = _batch(u);
+      });
+    }
   }
 
   Future<void> _loadUser() async {
@@ -41,8 +78,17 @@ class _DashboardPageState extends State<DashboardPage> {
     if (mounted) {
       setState(() {
         _user = u;
+        _dataFuture = _batch(u);
       });
     }
+  }
+
+  Future<void> _reload() async {
+    final u = _user;
+    setState(() {
+      _dataFuture = _batch(u);
+    });
+    await _dataFuture;
   }
 
   /// دور المستخدم الحقيقي بعد تسجيل الدخول AST-FR-08.
@@ -70,7 +116,9 @@ class _DashboardPageState extends State<DashboardPage> {
     final transfer = (
       title: tr(context, 'transfer'),
       icon: Icons.swap_horiz,
-      page: const TransfersPage(),
+      page: _role == UserRole.custodian
+          ? TransfersPage(scopeLocationId: _user?.collegeScope)
+          : const TransfersPage(),
     );
     final risk = (
       title: tr(context, 'risk'),
@@ -181,9 +229,6 @@ class _DashboardPageState extends State<DashboardPage> {
         ],
       ),
 
-      // =========================
-      // Drawer
-      // =========================
       drawer: Drawer(
         child: ListView(
           padding: EdgeInsets.zero,
@@ -338,59 +383,16 @@ class _DashboardPageState extends State<DashboardPage> {
             ListTile(
               leading: const Icon(Icons.settings_outlined),
               title: Text(tr(context, 'settings')),
-              onTap: () {},
-            ),
-
-            // Language & Theme inside drawer (تطبق على التطبيق كله فوريا)
-            AnimatedBuilder(
-              animation: appSettings,
-              builder: (_, __) => Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  ListTile(
-                    leading: Icon(
-                      appSettings.isDark
-                          ? Icons.light_mode_outlined
-                          : Icons.dark_mode_outlined,
-                    ),
-                    title: Text(tr(context, 'darkMode')),
-                    trailing: Text(
-                      appSettings.isDark
-                          ? (Localizations.localeOf(context).languageCode ==
-                                    'ar'
-                                ? 'تشغيل'
-                                : 'ON')
-                          : (Localizations.localeOf(context).languageCode ==
-                                    'ar'
-                                ? 'إيقاف'
-                                : 'OFF'),
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        color: Colors.grey,
-                      ),
-                    ),
-                    onTap: () => appSettings.toggleTheme(),
-                  ),
-                  ListTile(
-                    leading: const Icon(Icons.language_outlined),
-                    title: Text(tr(context, 'language')),
-                    trailing: Text(
-                      appSettings.isArabic ? 'عربي' : 'EN',
-                      style: const TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                    onTap: () => appSettings.toggleLocale(),
-                  ),
-                ],
-              ),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const SettingsPage()),
+                );
+              },
             ),
 
             const Divider(),
-
-            // ListTile(
-            //   leading: const Icon(Icons.logout,color: AppColors.red,),
-            //   title: const Text('Logout',style: TextStyle(color: AppColors.red,),),
-            //   onTap: () {},
-            // ),
             ListTile(
               leading: const Icon(Icons.logout, color: AppColors.red),
               title: Text(
@@ -411,27 +413,16 @@ class _DashboardPageState extends State<DashboardPage> {
         ),
       ),
 
-      // =========================
-      // Body
-      // =========================
+
       body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(16),
+        child: RefreshIndicator(
+          onRefresh: _reload,
+          child: SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsets.all(16),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Welcome - اسم المستخدم من الداتا بعد اللوجن
-              // Builder(builder: (context) {
-              //   final name = _user?.name.trim();
-              //   final title = (name == null || name.isEmpty)
-              //       ? 'Welcome back 👋'
-              //       : 'Welcome back, $name 👋';
-              //   return Text(
-              //     title,
-              //     style: const TextStyle(
-              //         fontSize: 24, fontWeight: FontWeight.bold),
-              //   );
-              // }),
               Text(
                 welcomeUser(context, _user?.name.trim()),
                 style: const TextStyle(
@@ -449,16 +440,10 @@ class _DashboardPageState extends State<DashboardPage> {
 
               const SizedBox(height: 20),
 
-              // =========================
-              // Dashboard Statistics - حسب الدور AST-FR-08
-              // =========================
-              DashboardStats(user: _user),
+              DashboardStats(user: _user, future: _dataFuture, onRetry: _reload),
 
               const SizedBox(height: 24),
 
-              // =========================
-              // Maintenance Risk - للتشغيل والمراجعة فقط
-              // =========================
               if (_role != UserRole.procurement) ...[
                 Text(
                   tr(context, 'maintRisk'),
@@ -468,14 +453,14 @@ class _DashboardPageState extends State<DashboardPage> {
                   ),
                 ),
                 const SizedBox(height: 12),
-                const DashboardRiskSection(),
+                DashboardRiskSection(future: _dataFuture),
                 const SizedBox(height: 24),
               ],
 
               // =========================
               // Role sections AST-FR-08
               // =========================
-              DashboardSections(user: _user),
+              DashboardSections(user: _user, future: _dataFuture, onRetry: _reload),
 
               // =========================
               // Quick Actions - حسب الدور AST-FR-08
@@ -537,6 +522,7 @@ class _DashboardPageState extends State<DashboardPage> {
                 },
               ),
             ],
+          ),
           ),
         ),
       ),

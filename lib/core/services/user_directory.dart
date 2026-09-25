@@ -27,6 +27,18 @@ class UserDirectory {
         m['email']?.toString());
   }
 
+  /// Safe version for unknown backend shapes: nested user may arrive as
+  /// an object, a scalar id, or be absent. Never throws.
+  /// Backend responses vary (object vs scalar id); a blind `as Map?`
+  /// crashes the whole list fetch on the first scalar.
+  void learnDynamic(dynamic v) {
+    if (v is Map) {
+      learnMap(v);
+    } else if (v != null && v.toString().isNotEmpty) {
+      learn(v.toString(), null);
+    }
+  }
+
   List<DirectoryUser> get all => _users.values.toList()
     ..sort((a, b) => a.name.compareTo(b.name));
 

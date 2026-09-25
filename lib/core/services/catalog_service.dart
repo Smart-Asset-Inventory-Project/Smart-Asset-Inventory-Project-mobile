@@ -9,14 +9,28 @@ class CatalogService {
   CatalogService({ApiService? api}) : _api = api ?? ApiService.instance;
   final ApiService _api;
 
+  /// 5-min memory cache: categories rarely change, fetched on every
+  /// asset list/form open.
+  static List<CategoryModel>? _catCache;
+  static DateTime? _catAt;
+  static const _ttl = Duration(minutes: 5);
+
   Future<List<CategoryModel>> fetchCategories() async {
+    if (_catCache != null &&
+        _catAt != null &&
+        DateTime.now().difference(_catAt!) < _ttl) {
+      return _catCache!;
+    }
     final res = await _api.get(AppConstants.categoriesEndpoint,
-        query: const {'limit': '200'});
+        query: {'limit': '${AppConstants.pageSize}'});
     final body = Map<String, dynamic>.from(res.data as Map);
-    return ((body['data'] as List? ?? []))
+    final list = ((body['data'] as List? ?? []))
         .map((e) =>
             CategoryModel.fromJson(Map<String, dynamic>.from(e as Map)))
         .toList();
+    _catCache = list;
+    _catAt = DateTime.now();
+    return list;
   }
 }
 
@@ -129,7 +143,7 @@ class DashboardApi {
       return DashboardSummary.fromJson(
           Map<String, dynamic>.from(body['data'] as Map));
     } on DioException catch (e) {
-      if ((AppConstants.allowMockFallback && e.response == null) ||
+      if ((AppConstants.allowMockFallback) ||
           e.response?.statusCode == 404) {
         return null;
       }

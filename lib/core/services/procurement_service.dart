@@ -17,34 +17,102 @@ class ProcurementService {
         .toList();
   }
 
-  Future<List<WarrantyInfo>> fetchWarranties() async {
-    final res = await _api.get(AppConstants.warrantiesEndpoint,
-        query: const {'limit': '200'});
+  Future<List<WarrantyInfo>> fetchWarranties({String? assetId}) async {
+    final res = await _api.get(AppConstants.warrantiesEndpoint, query: {
+      'limit': '${AppConstants.pageSize}',
+      if (assetId != null && assetId.isNotEmpty) 'assetId': assetId,
+    });
     return _list(res).map(WarrantyInfo.fromJson).toList();
   }
 
-  Future<List<PurchaseOrderInfo>> fetchPurchaseOrders() async {
-    final res = await _api.get(AppConstants.purchaseOrdersEndpoint,
-        query: const {'limit': '200'});
+  /// GET /warranties/expiring?days=30 — future expirations within days.
+  Future<List<WarrantyInfo>> fetchExpiringWarranties({int days = 30}) async {
+    try {
+      final res = await _api.get(
+        AppConstants.warrantiesExpiringEndpoint,
+        query: {'limit': '${AppConstants.pageSize}', 'days': '$days'},
+      );
+      return _list(res).map(WarrantyInfo.fromJson).toList();
+    } on DioException catch (e) {
+      if ((AppConstants.allowMockFallback) ||
+          e.response?.statusCode == 404) {
+        return [];
+      }
+      rethrow;
+    }
+  }
+
+  Future<List<PurchaseOrderInfo>> fetchPurchaseOrders({String? status}) async {
+    final res = await _api.get(AppConstants.purchaseOrdersEndpoint, query: {
+      'limit': '${AppConstants.pageSize}',
+      if (status != null && status.isNotEmpty) 'status': status,
+    });
     return _list(res).map(PurchaseOrderInfo.fromJson).toList();
   }
 
-  Future<List<InvoiceInfo>> fetchInvoices() async {
-    final res = await _api.get(AppConstants.invoicesEndpoint,
-        query: const {'limit': '200'});
+  Future<List<InvoiceInfo>> fetchInvoices({String? status}) async {
+    final res = await _api.get(AppConstants.invoicesEndpoint, query: {
+      'limit': '${AppConstants.pageSize}',
+      if (status != null && status.isNotEmpty) 'status': status,
+    });
     return _list(res).map(InvoiceInfo.fromJson).toList();
   }
 
-  Future<List<SupplierInfo>> fetchSuppliers() async {
-    final res = await _api.get(AppConstants.suppliersEndpoint,
-        query: const {'limit': '200'});
+  Future<List<SupplierInfo>> fetchSuppliers({String? search}) async {
+    final res = await _api.get(AppConstants.suppliersEndpoint, query: {
+      'limit': '${AppConstants.pageSize}',
+      if (search != null && search.isNotEmpty) 'search': search,
+    });
     return _list(res).map(SupplierInfo.fromJson).toList();
+  }
+
+  /// Supplier -> PO -> invoice workflow. Money as JSON numbers.
+  /// Invoiced POs cannot switch suppliers or be deleted (409).
+  Future<Map<String, dynamic>> createSupplier(Map<String, dynamic> data) async {
+    final res = await _api.post(AppConstants.suppliersEndpoint, data: data);
+    return Map<String, dynamic>.from(
+        (Map<String, dynamic>.from(res.data as Map))['data'] as Map);
+  }
+
+  Future<Map<String, dynamic>> createPurchaseOrder(Map<String, dynamic> data) async {
+    final res = await _api.post(AppConstants.purchaseOrdersEndpoint, data: data);
+    return Map<String, dynamic>.from(
+        (Map<String, dynamic>.from(res.data as Map))['data'] as Map);
+  }
+
+  Future<Map<String, dynamic>> createInvoice(Map<String, dynamic> data) async {
+    final res = await _api.post(AppConstants.invoicesEndpoint, data: data);
+    return Map<String, dynamic>.from(
+        (Map<String, dynamic>.from(res.data as Map))['data'] as Map);
+  }
+
+  Future<Map<String, dynamic>> createWarranty(Map<String, dynamic> data) async {
+    final res = await _api.post(AppConstants.warrantiesEndpoint, data: data);
+    return Map<String, dynamic>.from(
+        (Map<String, dynamic>.from(res.data as Map))['data'] as Map);
+  }
+
+  Future<void> deleteSupplier(String id) async {
+    await _api.delete('${AppConstants.suppliersEndpoint}/$id');
+  }
+
+  Future<void> deletePurchaseOrder(String id) async {
+    await _api.delete('${AppConstants.purchaseOrdersEndpoint}/$id');
   }
 
   Future<ProcurementInfo> fetchForAsset(String assetId) async {
     try {
-      final warranties = await fetchWarranties();
-      final orders = await fetchPurchaseOrders();
+      // Server-side filter first — was downloading all warranties + orders.
+      final results = await Future.wait([
+        fetchWarranties(assetId: assetId),
+        fetchPurchaseOrders(),
+      ]);
+      final warranties = results[0] as List<WarrantyInfo>;
+      final allOrders = results[1] as List<PurchaseOrderInfo>;
+      final orders = allOrders.where((x) {
+        if (x.assetId.isNotEmpty) return x.assetId == assetId;
+        return true;
+      }).toList();
       final w = warranties.where((x) => x.assetId == assetId).toList();
       final pos = orders.where((x) => x.assetId == assetId).toList();
       final w0 = w.isEmpty ? null : w.first;
@@ -67,7 +135,7 @@ class ProcurementService {
         warrantyTerms: w0?.terms,
       );
     } on DioException catch (e) {
-      if ((AppConstants.allowMockFallback && e.response == null) ||
+      if ((AppConstants.allowMockFallback) ||
           e.response?.statusCode == 404) {
         return ProcurementInfo(
           assetId: assetId,

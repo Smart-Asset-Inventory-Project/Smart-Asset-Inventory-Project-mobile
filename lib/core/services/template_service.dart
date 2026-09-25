@@ -12,7 +12,7 @@ class TemplateService {
     try {
       final res = await _api.get(
         AppConstants.maintenanceTemplatesEndpoint,
-        query: const {'limit': '200'},
+        query: {'limit': '${AppConstants.pageSize}'},
       );
       final body = Map<String, dynamic>.from(res.data as Map);
       var list = ((body['data'] as List? ?? []))
@@ -28,12 +28,22 @@ class TemplateService {
       return list;
     } on DioException catch (e) {
       // لا endpoint بديل: mock عند غياب السيرفر أو 404.
-      if ((AppConstants.allowMockFallback && e.response == null) ||
+      if ((AppConstants.allowMockFallback) ||
           e.response?.statusCode == 404) {
         return _mock(category);
       }
       rethrow;
     }
+  }
+
+  /// POST /maintenance-templates {name, triggerType TIME_BASED|MANUAL,
+  /// frequencyDays (positive int for TIME_BASED), tasks array, categoryId?}.
+  Future<MaintenanceTemplate> createTemplate(Map<String, dynamic> data) async {
+    final res =
+        await _api.post(AppConstants.maintenanceTemplatesEndpoint, data: data);
+    final body = Map<String, dynamic>.from(res.data as Map);
+    return MaintenanceTemplate.fromJson(
+        Map<String, dynamic>.from(body['data'] as Map));
   }
 
   List<MaintenanceTemplate> _mock(String? category) {

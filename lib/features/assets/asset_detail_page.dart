@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import '../../core/services/ai_prediction_service.dart';
 import '../../core/services/asset_service.dart';
 import '../../core/theme/app_colors.dart';
+import '../../models/ai_prediction_model.dart';
 import '../../models/asset_model.dart';
 import '../custody/request_transfer_page.dart';
 import '../maintenance/create_work_order_page.dart';
@@ -124,6 +126,63 @@ class _AssetDetailPageState extends State<AssetDetailPage> {
                       a.purchaseCost?.toString() ?? '-'),
                   _row(tr(context, 'purchaseDate'), a.purchaseDate ?? '-'),
                 ]),
+
+                const SizedBox(height: 16),
+
+                // Card: سجل الأصل (نقل/عهدة/صيانة) — GET /assets/{id}/history
+                _sectionCard(context, 'History', [
+                  FutureBuilder<List<Map<String, dynamic>>>(
+                    future: AssetService().fetchAssetHistory(widget.assetId),
+                    builder: (context, hsnap) {
+                      if (hsnap.connectionState == ConnectionState.waiting) {
+                        return const Padding(
+                          padding: EdgeInsets.all(8),
+                          child: Center(
+                              child: SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(
+                                      strokeWidth: 2))),
+                        );
+                      }
+                      final events = hsnap.data ?? [];
+                      if (events.isEmpty) {
+                        return const Text('-',
+                            style: TextStyle(color: Colors.grey));
+                      }
+                      return Column(
+                        children: events.take(10).map((e) {
+                          final at = (e['at'] ?? '').toString();
+                          final day = at.length >= 10 ? at.substring(0, 10) : at;
+                          return Padding(
+                            padding:
+                                const EdgeInsets.symmetric(vertical: 4),
+                            child: Row(
+                              children: [
+                                const Icon(Icons.history_outlined,
+                                    size: 16, color: Colors.grey),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    '${e['type'] ?? ''} • ${e['action'] ?? ''} • $day',
+                                    style: const TextStyle(fontSize: 12),
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        }).toList(),
+                      );
+                    },
+                  ),
+                ]),
+
+                const SizedBox(height: 16),
+
+                // Card: توقع الصيانة بالذكاء الاصطناعي (عند الطلب فقط)
+                _AiPredictionCard(asset: a),
 
                 const SizedBox(height: 32),
                 HideForAuditor(
@@ -340,6 +399,215 @@ class _AssetDetailPageState extends State<AssetDetailPage> {
           Text(k, style: TextStyle(color: Colors.grey.shade600, fontSize: 13)),
           Text(v, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
         ],
+      ),
+    );
+  }
+}
+
+/// AI failure-risk prediction for one asset — on demand only.
+/// Shows loading, validation (missing asset fields / 422 details) and
+/// network-error states, then level + score + probability + inputs used.
+class _AiPredictionCard extends StatefulWidget {
+  final AssetModel asset;
+  const _AiPredictionCard({required this.asset});
+
+  @override
+  State<_AiPredictionCard> createState() => _AiPredictionCardState();
+}
+
+class _AiPredictionCardState extends State<_AiPredictionCard> {
+  Future<({AiPredictRequest req, AiPredictResult res, bool costRecords})>?
+      _future;
+
+  void _run() => setState(() {
+        _future =
+            AiPredictionService().predictForAsset(widget.asset);
+      });
+
+  Color _levelColor(String level) {
+    switch (level.toUpperCase()) {
+      case 'LOW':
+        return Colors.green;
+      case 'MEDIUM':
+        return Colors.orange;
+      case 'HIGH':
+      case 'CRITICAL':
+        return Colors.red;
+      default:
+        return Colors.grey;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: Colors.grey.shade200),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Text('AI Prediction',
+                    style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.blue.withValues(alpha: 0.8))),
+                const Spacer(),
+                if (_future != null)
+                  TextButton(
+                    onPressed: _run,
+                    child: const Text('Re-run'),
+                  ),
+              ],
+            ),
+            const Divider(height: 24),
+            if (_future == null)
+              SizedBox(
+                width: double.infinity,
+                height: 46,
+                child: ElevatedButton.icon(
+                  icon: const Icon(Icons.psychology_outlined, size: 20),
+                  label: const Text('Predict failure risk'),
+                  onPressed: _run,
+                ),
+              )
+            else
+              FutureBuilder<
+                  ({
+                    AiPredictRequest req,
+                    AiPredictResult res,
+                    bool costRecords
+                  })>(
+                future: _future,
+                builder: (context, snap) {
+                  if (snap.connectionState == ConnectionState.waiting) {
+                    return const Padding(
+                      padding: EdgeInsets.all(12),
+                      child: Center(child: CircularProgressIndicator()),
+                    );
+                  }
+                  if (snap.hasError) {
+                    final err = snap.error;
+                    final details = err is AiRequestException
+                        ? err.details
+                        : const <String>[];
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          err is AiRequestException
+                              ? err.message
+                              : err.toString().replaceFirst('Exception: ', ''),
+                          style: const TextStyle(
+                              color: Colors.red, fontSize: 13),
+                        ),
+                        ...details.map((d) => Padding(
+                              padding:
+                                  const EdgeInsets.only(top: 4),
+                              child: Text('• $d',
+                                  style: const TextStyle(fontSize: 12)),
+                            )),
+                        const SizedBox(height: 8),
+                        OutlinedButton(
+                          onPressed: _run,
+                          child: const Text('Retry'),
+                        ),
+                      ],
+                    );
+                  }
+                  final r = snap.data!.res;
+                  final q = snap.data!.req;
+                  final color = _levelColor(r.riskLevel);
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 12, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: color.withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Text(
+                              r.riskLevel.isEmpty ? '-' : r.riskLevel,
+                              style: TextStyle(
+                                  color: color,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 15),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              'Score ${r.riskScore.toStringAsFixed(1)} / 100 • '
+                              'Failure ${r.probabilityPercent.toStringAsFixed(1)}%',
+                              style: const TextStyle(
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 13),
+                            ),
+                          ),
+                        ],
+                      ),
+                      if (r.failurePredicted)
+                        const Padding(
+                          padding: EdgeInsets.only(top: 6),
+                          child: Text('Failure predicted',
+                              style: TextStyle(
+                                  color: Colors.red,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 13)),
+                        ),
+                      if (r.isAiFallback)
+                        const Padding(
+                          padding: EdgeInsets.only(top: 6),
+                          child: Text('Fallback model used',
+                              style: TextStyle(
+                                  color: Colors.orange, fontSize: 12)),
+                        ),
+                      if (r.reasons.isNotEmpty) ...[
+                        const SizedBox(height: 6),
+                        ...r.reasons.map((e) => Padding(
+                              padding:
+                                  const EdgeInsets.only(top: 2),
+                              child: Text('• $e',
+                                  style: const TextStyle(fontSize: 12)),
+                            )),
+                      ],
+                      const Divider(height: 24),
+                      Text(
+                        'Inputs: age ${q.assetAgeMonths}m / life ${q.expectedLifetimeMonths}m / '
+                        '${q.condition} / maintenance ${q.maintenanceCount} '
+                        '(90d: ${q.recentMaintenanceCount90d}) / '
+                        'downtime ${q.downtimeHours90d}h / cost ${q.repairCost90d}',
+                        style: TextStyle(
+                            fontSize: 11, color: Colors.grey.shade600),
+                      ),
+                      if (!snap.data!.costRecords)
+                        Text(
+                          'No service-event cost records — 90d sums are 0 from work orders alone.',
+                          style: TextStyle(
+                              fontSize: 11, color: Colors.grey.shade600),
+                        ),
+                      if (r.modelVersion.isNotEmpty)
+                        Text(
+                          'Model: ${r.modelVersion}',
+                          style: TextStyle(
+                              fontSize: 11, color: Colors.grey.shade600),
+                        ),
+                    ],
+                  );
+                },
+              ),
+          ],
+        ),
       ),
     );
   }

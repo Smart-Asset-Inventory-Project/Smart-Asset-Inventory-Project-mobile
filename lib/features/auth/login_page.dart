@@ -248,8 +248,10 @@
 //   }
 // }
 
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 
+import '../../core/constants/app_constants.dart';
 import '../../core/l10n/strings.dart';
 import '../../core/theme/app_settings.dart';
 import '../../core/services/auth_service.dart';
@@ -266,6 +268,32 @@ class _LoginPageState extends State<LoginPage> {
   bool isAdmin = false;
   bool obscurePassword = true;
   bool _loading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // Warm-up: wakes the sleeping Vercel function while the user types,
+    // so the real login (cold start ~5s) feels instant. Fire-and-forget:
+    // any response (even 401) means warm. Dev-mock unaffected.
+    _warmBackend();
+  }
+
+  Future<void> _warmBackend() async {
+    try {
+      await Dio(
+        BaseOptions(
+          baseUrl: AppConstants.baseUrl,
+          connectTimeout: const Duration(seconds: 10),
+          receiveTimeout: const Duration(seconds: 10),
+          headers: {'Content-Type': 'application/json'},
+        ),
+      ).get('/assets', queryParameters: {'limit': '1'}).timeout(
+            const Duration(seconds: 12),
+          );
+    } catch (_) {
+      // ignored: login works the same on a cold backend, just slower once.
+    }
+  }
 
   final emailController = TextEditingController();
   final passwordController = TextEditingController();
@@ -291,17 +319,23 @@ class _LoginPageState extends State<LoginPage> {
 
     setState(() => _loading = true);
     try {
-      await _auth.login(email: email, password: password);
+      final user = await _auth.login(email: email, password: password);
       if (!mounted) return;
       // AST Auth: الدور الحقيقي يأتي من الباك اند داخل التوكن/اليوزر.
+      // نمرر اليوزر مباشرة فيوفر Dashboard رحلة /auth/me تسلسلية.
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (context) => const DashboardPage()),
+        MaterialPageRoute(builder: (context) => DashboardPage(user: user)),
       );
     } catch (e) {
       if (!mounted) return;
+      final raw = e.toString().replaceFirst('Exception: ', '');
+      // مفاتيح أخطاء الشبكة تترجم، رسائل السيرفر تعرض كما هي.
+      final msg = raw == 'timeoutRetry' || raw == 'noInternet'
+          ? tr(context, raw)
+          : raw;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))),
+        SnackBar(content: Text(msg)),
       );
     } finally {
       if (mounted) setState(() => _loading = false);

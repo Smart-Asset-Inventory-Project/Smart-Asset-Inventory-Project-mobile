@@ -44,6 +44,7 @@ class AssetModel {
   final double? purchaseCost;
   final String? purchaseDate;
   final String? qrCodeUrl;
+  final int? usefulLifeYears;
 
   const AssetModel({
     required this.id,
@@ -63,6 +64,7 @@ class AssetModel {
     this.purchaseCost,
     this.purchaseDate,
     this.qrCodeUrl,
+    this.usefulLifeYears,
   });
 
   static double? _num(dynamic v) {
@@ -99,6 +101,23 @@ class AssetModel {
           _num(json['purchaseCost']) ?? _num(json['value']),
       purchaseDate: json['purchaseDate']?.toString(),
       qrCodeUrl: json['qrCodeUrl']?.toString(),
+      usefulLifeYears: (json['usefulLifeYears'] as num?)?.toInt(),
     );
+  }
+
+  /// Age in whole months from purchaseDate. null when unknown (AI blocks).
+  int? get ageMonths {
+    final d = DateTime.tryParse(purchaseDate ?? '');
+    if (d == null) return null;
+    final now = DateTime.now();
+    final m = (now.year - d.year) * 12 + now.month - d.month;
+    return m < 0 ? 0 : m;
+  }
+
+  /// Expected lifetime in months for the AI request. null when unknown.
+  int? get expectedLifetimeMonths {
+    final y = usefulLifeYears;
+    if (y == null || y <= 0) return null;
+    return y * 12;
   }
 }

@@ -25,7 +25,7 @@ class RetirementService {
         },
       );
     } on DioException catch (e) {
-      if (AppConstants.allowMockFallback && e.response == null) {
+      if (AppConstants.allowMockFallback) {
         return; // mock accept
       }
       throw Exception(AuthService.backendMessage(e, 'Retire failed'));
@@ -35,14 +35,14 @@ class RetirementService {
   Future<List<RetirementInfo>> fetchRetirements() async {
     try {
       final res = await _api.get(AppConstants.retirementsEndpoint,
-          query: const {'limit': '200'});
+          query: {'limit': '${AppConstants.pageSize}'});
       final body = Map<String, dynamic>.from(res.data as Map);
       return ((body['data'] as List? ?? []))
           .map((e) => RetirementInfo.fromJson(
               Map<String, dynamic>.from(e as Map)))
           .toList();
     } on DioException catch (e) {
-      if ((AppConstants.allowMockFallback && e.response == null) ||
+      if ((AppConstants.allowMockFallback) ||
           e.response?.statusCode == 404) {
         return [];
       }

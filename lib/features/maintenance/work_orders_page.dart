@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../core/l10n/strings.dart';
+import '../../core/services/auth_service.dart';
 import '../../core/services/work_order_service.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/widgets/role_gate.dart';
@@ -11,7 +12,18 @@ import 'work_order_detail_page.dart';
 /// initialStatus يفتح الصفحة على فلتر جاهز (من كروت الداشبورد).
 class WorkOrdersPage extends StatefulWidget {
   final String? initialStatus;
-  const WorkOrdersPage({super.key, this.initialStatus});
+
+  /// Technician "my orders": server filter when supported,
+  /// client filter for due/overdue lists (/due has no user filter).
+  final String? assignedToUserId;
+
+  /// Custodian scope: show only orders for these asset ids.
+  final Set<String>? assetIds;
+  const WorkOrdersPage(
+      {super.key,
+      this.initialStatus,
+      this.assignedToUserId,
+      this.assetIds});
 
   @override
   State<WorkOrdersPage> createState() => _WorkOrdersPageState();
@@ -29,8 +41,22 @@ class _WorkOrdersPageState extends State<WorkOrdersPage> {
   }
 
   void _reload({bool initial = false}) {
-    final f = WorkOrderService().fetchWorkOrders(
-        status: _status == 'all' ? null : _status);
+    Future<List<WorkOrderModel>> f;
+    if (_status == 'due') {
+      // GET /work-orders/due scheduling list.
+      f = WorkOrderService()
+          .fetchDueWorkOrders()
+          .then((list) => _forTech(list));
+    } else if (_status == 'overdue') {
+      f = WorkOrderService()
+          .fetchOverdue()
+          .then((list) => _forTech(list));
+    } else {
+      f = WorkOrderService().fetchWorkOrders(
+        status: _status == 'all' ? null : _status,
+        assignedToUserId: widget.assignedToUserId,
+      );
+    }
     if (initial) {
       _future = f;
     } else {
@@ -38,6 +64,13 @@ class _WorkOrdersPageState extends State<WorkOrdersPage> {
         _future = f;
       });
     }
+  }
+
+  /// Client-side tech filter for lists whose endpoint has no user query.
+  List<WorkOrderModel> _forTech(List<WorkOrderModel> list) {
+    final t = widget.assignedToUserId;
+    if (t == null || t.isEmpty) return list;
+    return list.where((w) => w.technicianId == t).toList();
   }
 
   @override
@@ -63,7 +96,7 @@ class _WorkOrdersPageState extends State<WorkOrdersPage> {
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.all(12),
             child: Row(
-              children: ['all', 'open', 'inProgress', 'closed', 'cancelled']
+              children: ['all', 'due', 'overdue', 'open', 'assigned', 'inProgress', 'closed', 'cancelled']
                   .map((s) => Padding(
                         padding: const EdgeInsets.only(right: 8),
                         child: ChoiceChip(
@@ -87,10 +120,11 @@ class _WorkOrdersPageState extends State<WorkOrdersPage> {
                 }
                 if (snap.hasError) {
                   return Center(
-                    child: Text('${tr(context, 'failedRisk')}: ${snap.error}'),
+                    child: Text(
+                        '${tr(context, 'failedRisk')}: ${AuthService.friendlyError(snap.error!)}'),
                   );
                 }
-                final items = snap.data ?? [];
+                final items = _visible(snap.data ?? []);
                 if (items.isEmpty) {
                   return Center(child: Text(tr(context, 'noWorkOrders')));
                 }
@@ -175,8 +209,13 @@ class _WorkOrdersPageState extends State<WorkOrdersPage> {
     );
   }
 
-  Widget _badge(String text, Color color) {
-    return Container(
+  /// Client-side scope filter — same asset set the dashboard card counts.
+  List<WorkOrderModel> _visible(List<WorkOrderModel> items) {
+    if (widget.assetIds == null) return items;
+    return items.where((w) => widget.assetIds!.contains(w.assetId)).toList();
+  }
+
+  Widget _badge(String text, Color color) {    return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.1),

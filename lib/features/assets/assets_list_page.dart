@@ -20,12 +20,20 @@ class AssetsListPage extends StatefulWidget {
 
   /// نطاق الكاستوديان (scopeLocationId): يفلتر الأصول بالنطاق.
   final String? scopeLocationId;
+
+  /// عهدة المستخدم الحقيقية (من سجلات العهدة): يعرض هذه الأصول فقط.
+  final Set<String>? assetIds;
+
+  /// المحتاجة اهتمام فقط (condition != good).
+  final bool attentionOnly;
   const AssetsListPage(
       {super.key,
       this.locationId,
       this.locationName,
       this.initialCategory,
-      this.scopeLocationId});
+      this.scopeLocationId,
+      this.assetIds,
+      this.attentionOnly = false});
 
   @override
   State<AssetsListPage> createState() => _AssetsListPageState();
@@ -78,6 +86,20 @@ class _AssetsListPageState extends State<AssetsListPage> {
   void dispose() {
     _search.dispose();
     super.dispose();
+  }
+
+  /// Client-side custody/attention filters — same rules as dashboard counts.
+  List<AssetModel> _visible(List<AssetModel> items) {
+    var out = items;
+    if (widget.assetIds != null) {
+      out = out.where((a) => widget.assetIds!.contains(a.id)).toList();
+    }
+    if (widget.attentionOnly) {
+      out = out
+          .where((a) => a.condition.toLowerCase() != 'good')
+          .toList();
+    }
+    return out;
   }
 
   IconData _catIcon(String cat) {
@@ -212,7 +234,7 @@ class _AssetsListPageState extends State<AssetsListPage> {
                     ),
                   );
                 }
-                final items = snap.data ?? [];
+                final items = _visible(snap.data ?? []);
                 if (items.isEmpty) {
                   return const Center(child: Text('No assets found'));
                 }

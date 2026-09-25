@@ -23,10 +23,29 @@ class AuthService {
   final FlutterSecureStorage _storage;
   final Dio _dio;
 
+  /// Memory cache: HideForAuditor + pages call currentUser() per button.
+  /// Serves fresh (<60s) user without another /auth/me round-trip.
+  static UserModel? _memUser;
+  static DateTime? _memAt;
+  static const _memTtl = Duration(seconds: 60);
+
+  static void _remember(UserModel u) {
+    _memUser = u;
+    _memAt = DateTime.now();
+  }
+
+  static void clearMemoryCache() {
+    _memUser = null;
+    _memAt = null;
+  }
+
   Future<UserModel> login({
     required String email,
     required String password,
   }) async {
+    // Backend first, always: healthy backend is used for real.
+    // Mock only when it is unreachable or crashing (no response / 5xx).
+    // Real rejections (401 wrong password, 403, 400) always surface.
     try {
       final res = await _dio.post(
         AppConstants.loginEndpoint,
@@ -45,22 +64,33 @@ class AuthService {
       }
       await _storage.write(
           key: AppConstants.userKey, value: jsonEncode(user.toJson()));
+      _remember(user);
       return user;
     } on DioException catch (e) {
-      // Fallback mock فقط لو العلم مفتوح (اختبارات) ولا رد من السيرفر.
-      // رد حقيقي (401 بيانات غلط) يظهر كخطأ ولا يدخل mock.
-      if (AppConstants.allowMockFallback && e.response == null) {
+      // Mock فقط للباك الميت (بلا رد / 5xx). الرفض الحقيقي
+      // (401 بيانات غلط، 403، 400) يظهر كخطأ ولا يدخل mock أبدا.
+      final code = e.response?.statusCode;
+      if (AppConstants.allowMockFallback && (code == null || code >= 500)) {
         final mock = UserModel.mock(email);
         await _storage.write(key: AppConstants.tokenKey, value: 'mock-token');
         await _storage.write(
             key: AppConstants.userKey, value: jsonEncode(mock.toJson()));
         return mock;
       }
-      throw Exception(_backendMessage(e, 'Login failed'));
+      throw Exception(loginErrorMessage(e));
     }
   }
 
+  /// سبب فشل اللوجن للعرض: رسالة سيرفر أو مشكلة شبكة واضحة.
+  static String loginErrorMessage(DioException e) {
+    final net = networkMessage(e);
+    if (net == 'timeout') return 'timeoutRetry';
+    if (net == 'offline') return 'noInternet';
+    return _backendMessage(e, 'Login failed');
+  }
+
   Future<void> logout() async {
+    clearMemoryCache();
     await _storage.delete(key: AppConstants.tokenKey);
     await _storage.delete(key: AppConstants.refreshTokenKey);
     await _storage.delete(key: AppConstants.userKey);
@@ -68,8 +98,13 @@ class AuthService {
 
   Future<String?> getToken() => _storage.read(key: AppConstants.tokenKey);
 
-  /// المستخدم من /auth/me أولا (طازج)، ثم المخزن محليا.
+  /// المستخدم من الذاكرة أولا (طازج <60s)، ثم /auth/me، ثم المخزن محليا.
   Future<UserModel?> currentUser() async {
+    if (_memUser != null &&
+        _memAt != null &&
+        DateTime.now().difference(_memAt!) < _memTtl) {
+      return _memUser;
+    }
     final token = await getToken();
     if (token == null || token == 'mock-token') {
       return _storedUser();
@@ -84,6 +119,7 @@ class AuthService {
           UserModel.fromJson(Map<String, dynamic>.from(body['data'] as Map));
       await _storage.write(
           key: AppConstants.userKey, value: jsonEncode(user.toJson()));
+      _remember(user);
       return user;
     } on DioException {
       return _storedUser();
@@ -104,6 +140,45 @@ class AuthService {
   /// رسالة الباك اند (zod VALIDATION_ERROR أو message) بدل رسالة عامة.
   static String backendMessage(DioException e, String fallback) =>
       _backendMessage(e, fallback);
+
+  /// Plain-language error for UI cards: raw Dio text (MDN links etc.)
+  /// means nothing to users. Covers the known production case: 500 on
+  /// work-orders until the backend deployment + migration lands.
+  static String friendlyError(Object e) {
+    if (e is DioException) {
+      final code = e.response?.statusCode;
+      if (code == 500) {
+        return 'Server error (500) — the backend crashed on this request. '
+            'Needs a backend-team fix (deployment + migration).';
+      }
+      if (code == 404) {
+        return 'Not found (404) — this API may not be deployed yet.';
+      }
+      if (code == 403) return backendMessage(e, 'Forbidden (403)');
+      if (code == 401) return 'Session expired — please log in again';
+      final net = networkMessage(e);
+      if (net == 'timeout') return 'Server is waking up — try again';
+      if (net == 'offline') return 'No internet connection';
+      return backendMessage(e, 'Request failed');
+    }
+    return e.toString().replaceFirst('Exception: ', '');
+  }
+
+  /// رسالة مناسبة لمشاكل الشبكة قبل أي رد سيرفر.
+  static String? networkMessage(DioException e) {
+    if (e.response != null) return null;
+    switch (e.type) {
+      case DioExceptionType.connectionTimeout:
+      case DioExceptionType.receiveTimeout:
+      case DioExceptionType.sendTimeout:
+        return 'timeout';
+      case DioExceptionType.connectionError:
+      case DioExceptionType.unknown:
+        return 'offline';
+      default:
+        return 'offline';
+    }
+  }
 
   static String _backendMessage(DioException e, String fallback) {
     final data = e.response?.data;

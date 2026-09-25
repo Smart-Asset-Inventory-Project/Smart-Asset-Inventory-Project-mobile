@@ -42,14 +42,22 @@ class MaintenanceTemplate {
     return [];
   }
 
-  factory MaintenanceTemplate.fromJson(Map<String, dynamic> json) =>
-      MaintenanceTemplate(
+  factory MaintenanceTemplate.fromJson(Map<String, dynamic> json) {
+    // Docs: triggerType TIME_BASED|MANUAL, frequencyDays, tasks array in /
+    // JSON-text out. Legacy app values calendar/runtime/condition kept.
+    final rawTrigger = (json['triggerType'] ?? 'calendar').toString();
+    final trigger = rawTrigger == 'TIME_BASED'
+        ? 'calendar'
+        : rawTrigger == 'MANUAL'
+            ? 'condition'
+            : rawTrigger;
+    return MaintenanceTemplate(
         id: json['id'].toString(),
         name: (json['name'] ?? '').toString(),
         category: (json['category'] ?? json['categoryId'] ?? '').toString(),
         categoryId: json['categoryId']?.toString(),
         description: json['description']?.toString(),
-        triggerType: (json['triggerType'] ?? 'calendar').toString(),
+        triggerType: trigger,
         intervalDays: (json['frequencyDays'] ?? json['intervalDays'] as num?)
             ?.toInt(),
         runtimeHours: (json['runtimeHours'] as num?)?.toInt(),
@@ -57,6 +65,7 @@ class MaintenanceTemplate {
         checklist: _tasks(json['tasks'] ?? json['checklist']),
         lastServiceDate: json['lastServiceDate']?.toString(),
       );
+  }
 
   /// تاريخ الاستحقاق القادم من القالب + آخر خدمة (calendar trigger).
   DateTime? get nextDue {

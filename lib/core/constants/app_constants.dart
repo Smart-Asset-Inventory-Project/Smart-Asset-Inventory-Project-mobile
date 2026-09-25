@@ -18,6 +18,13 @@ class AppConstants {
   static const String retirementsEndpoint = '/retirements';
   static const String auditLogsEndpoint = '/audit-logs';
   static const String dashboardSummaryEndpoint = '/dashboard/summary';
+  static const String custodyAssignmentsEndpoint = '/custody-assignments';
+  static const String serviceEventsEndpoint = '/service-events';
+  static const String warrantiesExpiringEndpoint = '/warranties/expiring';
+  static const String workOrdersDueEndpoint = '/work-orders/due';
+
+  /// Docs: page default 1, limit default 20, max 100. Never send >100.
+  static const int pageSize = 100;
 
   // مسارات بدون باك اند حتى الآن: fallback mock يعمل لها فقط.
   static const String riskQueueEndpoint = '/risk-queue';
@@ -27,9 +34,9 @@ class AppConstants {
   static const String refreshTokenKey = 'ast_refresh_token';
   static const String userKey = 'ast_auth_user';
 
-  /// false = الباك اند لايف. يتحول true فقط في اختبارات الـ widget
-  /// أو عند انقطاع السيرفر (endpoints الموجودة فقط).
-  /// endpoints الغائبة (risk/templates/procurement/retirement) تقع
-  /// على mock عند 404 مهما كانت قيمة العلم.
-  static bool allowMockFallback = false;
+  /// DEV_MOCK=true: mock عند الباك الميت فقط (بلا رد / 5xx).
+  /// بدونه (تشغيل Android Studio العادي): باك إند نقي 100% بدون أي mock.
+  /// الرفض الحقيقي (401/403/400) يظهر دائما ولا يُغطى في أي وضع.
+  static bool allowMockFallback =
+      const bool.fromEnvironment('DEV_MOCK', defaultValue: false);
 }

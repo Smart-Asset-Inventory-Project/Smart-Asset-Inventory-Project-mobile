@@ -47,7 +47,22 @@ class _LocationsPageState extends State<LocationsPage> {
             return const Center(child: CircularProgressIndicator());
           }
           if (snap.hasError) {
-            return Center(child: Text('${tr(context, 'error')}: ${snap.error}'));
+            return Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text('${tr(context, 'error')}: ${snap.error}'),
+                  const SizedBox(height: 8),
+                  ElevatedButton(
+                    onPressed: () => setState(() {
+                      LocationService.clearCache();
+                      _future = LocationService().fetchLocations();
+                    }),
+                    child: const Text('Retry'),
+                  ),
+                ],
+              ),
+            );
           }
           final all = snap.data ?? [];
           if (all.isEmpty) return Center(child: Text(tr(context, 'noLocations')));

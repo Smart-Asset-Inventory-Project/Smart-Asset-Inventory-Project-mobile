@@ -5,8 +5,12 @@ import '../../models/user_model.dart';
 import '../assets/assets_list_page.dart';
 import '../custody/transfers_page.dart';
 import '../maintenance/work_orders_page.dart';
+import '../procurement/expiring_warranties_page.dart';
+import '../retirement/retirements_page.dart';
 import '../../core/services/catalog_service.dart'
     show AuditLogInfo, AuditService;
+import '../../core/services/auth_service.dart';
+import '../../core/services/work_order_service.dart';
 import 'dashboard_stats.dart';
 
 /// AST-FR-08: أقسام الداشبورد حسب الدور.
@@ -14,7 +18,13 @@ import 'dashboard_stats.dart';
 /// الـBackend هو المسؤول الحقيقي عن authorization.
 class DashboardSections extends StatefulWidget {
   final UserModel? user;
-  const DashboardSections({super.key, this.user});
+
+  /// Shared load from DashboardPage. null = load own (backward compat).
+  final Future<DashboardData>? future;
+
+  /// Page-level reload (pull-to-refresh) for the error Retry.
+  final Future<void> Function()? onRetry;
+  const DashboardSections({super.key, this.user, this.future, this.onRetry});
 
   @override
   State<DashboardSections> createState() => _DashboardSectionsState();
@@ -23,18 +33,28 @@ class DashboardSections extends StatefulWidget {
 class _DashboardSectionsState extends State<DashboardSections> {
   late Future<DashboardData> _future;
 
+  Future<DashboardData> _ownLoad() => loadDashboardData(
+      userId: widget.user?.id,
+      scopeLocationId:
+          _role == UserRole.custodian ? widget.user?.collegeScope : null,
+      includeCustody: _role == UserRole.custodian);
+
   @override
   void initState() {
     super.initState();
-    _future = loadDashboardData(userId: widget.user?.id, scopeLocationId: _role == UserRole.custodian ? widget.user?.collegeScope : null);
+    _future = widget.future ?? _ownLoad();
   }
 
   @override
   void didUpdateWidget(DashboardSections old) {
     super.didUpdateWidget(old);
-    if (old.user?.id != widget.user?.id) {
+    if (old.future != widget.future && widget.future != null) {
       setState(() {
-        _future = loadDashboardData(userId: widget.user?.id, scopeLocationId: _role == UserRole.custodian ? widget.user?.collegeScope : null);
+        _future = widget.future!;
+      });
+    } else if (old.user?.id != widget.user?.id) {
+      setState(() {
+        _future = widget.future ?? _ownLoad();
       });
     }
   }
@@ -52,7 +72,31 @@ class _DashboardSectionsState extends State<DashboardSections> {
             child: Center(child: CircularProgressIndicator()),
           );
         }
-        if (snap.hasError || !snap.hasData) return const SizedBox.shrink();
+        if (snap.hasError) {
+          return Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    AuthService.friendlyError(snap.error!),
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(color: Colors.red),
+                  ),
+                  const SizedBox(height: 8),
+                  OutlinedButton(
+                    onPressed: widget.onRetry == null
+                        ? null
+                        : () => widget.onRetry!(),
+                    child: const Text('Retry'),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }
+        if (!snap.hasData) return const SizedBox.shrink();
         final d = snap.data!;
         switch (_role) {
           case UserRole.admin:
@@ -60,7 +104,9 @@ class _DashboardSectionsState extends State<DashboardSections> {
               _statusRow(context, d),
               _dueOverdue(context, d),
               _byCategory(context, d),
+              _breakdown(context, d),
               _recentTransfers(context, d),
+              _retirements(context, d),
               _lifecycle(context, d),
             ]);
           case UserRole.procurement:
@@ -72,6 +118,7 @@ class _DashboardSectionsState extends State<DashboardSections> {
             return Column(children: [
               _confirmAssignment(context, d),
               _myCondition(context, d),
+              _breakdown(context, d),
             ]);
           case UserRole.technician:
             return Column(children: [
@@ -203,8 +250,7 @@ class _DashboardSectionsState extends State<DashboardSections> {
     );
   }
 
-  Widget _recentTransfers(BuildContext context, DashboardData d) {
-    if (d.recentTransfers.isEmpty) return const SizedBox.shrink();
+  Widget _recentTransfers(BuildContext context, DashboardData d) {    if (d.recentTransfers.isEmpty) return const SizedBox.shrink();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -222,6 +268,41 @@ class _DashboardSectionsState extends State<DashboardSections> {
                       onTap: () => _go(const TransfersPage()),
                     ))
                 .toList(),
+          ),
+        ),
+        const SizedBox(height: 20),
+      ],
+    );
+  }
+
+  /// Retirement requests (admin): count + recent reasons.
+  Widget _retirements(BuildContext context, DashboardData d) {
+    if (d.retirementRequests == 0) return const SizedBox.shrink();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _title(context, 'retireRequests',
+            onViewAll: () => _go(const RetirementsPage())),
+        Card(
+          child: Column(
+            children: [
+              ListTile(
+                dense: true,
+                leading: const Icon(Icons.archive_outlined),
+                title: Text('${d.retirementRequests}'),
+                subtitle: const Text('requests'),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => _go(const RetirementsPage()),
+              ),
+              ...d.recentRetirements.map((r) => ListTile(
+                    dense: true,
+                    leading: const Icon(Icons.info_outline, size: 18),
+                    title: Text(r.assetTag ?? r.assetId,
+                        maxLines: 1, overflow: TextOverflow.ellipsis),
+                    subtitle: Text(r.reason ?? '-',
+                        maxLines: 1, overflow: TextOverflow.ellipsis),
+                  )),
+            ],
           ),
         ),
         const SizedBox(height: 20),
@@ -252,6 +333,7 @@ class _DashboardSectionsState extends State<DashboardSections> {
             trailing: Text('${d.expiringWarranties}',
                 style: const TextStyle(
                     fontSize: 18, fontWeight: FontWeight.bold)),
+            onTap: () => _go(const ExpiringWarrantiesPage()),
           ),
         ),
         const SizedBox(height: 20),
@@ -291,6 +373,48 @@ class _DashboardSectionsState extends State<DashboardSections> {
 
   // ---------- custodian ----------
 
+  /// Assets by condition + top locations inside assigned scope.
+  Widget _breakdown(BuildContext context, DashboardData d) {
+    if (d.byCondition.isEmpty && d.byLocation.isEmpty) {
+      return const SizedBox.shrink();
+    }
+    final locs = d.byLocation.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _title(context, 'assets',
+            onViewAll: () => _go(const AssetsListPage())),
+        Card(
+          child: Column(
+            children: [
+              ...d.byCondition.entries.map((e) => ListTile(
+                    dense: true,
+                    leading:
+                        const Icon(Icons.health_and_safety_outlined),
+                    title: Text(tr(context, e.key)),
+                    trailing: Text('${e.value}',
+                        style: const TextStyle(
+                            fontWeight: FontWeight.bold)),
+                  )),
+              ...locs.take(5).map((e) => ListTile(
+                    dense: true,
+                    leading:
+                        const Icon(Icons.location_city_outlined),
+                    title: Text(e.key,
+                        maxLines: 1, overflow: TextOverflow.ellipsis),
+                    trailing: Text('${e.value}',
+                        style: const TextStyle(
+                            fontWeight: FontWeight.bold)),
+                  )),
+            ],
+          ),
+        ),
+        const SizedBox(height: 20),
+      ],
+    );
+  }
+
   Widget _confirmAssignment(BuildContext context, DashboardData d) {
     if (d.pendingToMe == 0 && d.pendingTransfers == 0) {
       return const SizedBox.shrink();
@@ -304,7 +428,9 @@ class _DashboardSectionsState extends State<DashboardSections> {
           subtitle: Text(
               '${d.pendingToMe} • ${tr(context, 'pendingTransfers')}: ${d.pendingTransfers}'),
           trailing: const Icon(Icons.chevron_right),
-          onTap: () => _go(const TransfersPage()),
+          onTap: () => _go(TransfersPage(
+              scopeLocationId: widget.user?.collegeScope,
+              initialStatus: 'pending')),
         ),
       ),
       const SizedBox(height: 12),
@@ -315,11 +441,98 @@ class _DashboardSectionsState extends State<DashboardSections> {
           subtitle:
               Text('${tr(context, 'needsAttention')}: ${d.myNeedsAttention}'),
           trailing: const Icon(Icons.chevron_right),
-          onTap: () => _go(const AssetsListPage()),
+          onTap: () => _reportDialog(context),
         ),
       ),
       const SizedBox(height: 20),
     ]);
+  }
+
+  /// Report condition/missing: files a work order for the asset.
+  Future<void> _reportDialog(BuildContext context) async {
+    final assetCtrl = TextEditingController();
+    final notesCtrl = TextEditingController();
+    String kind = 'damaged';
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setD) => AlertDialog(
+          title: Text(tr(context, 'reportIssue')),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: assetCtrl,
+                  decoration: const InputDecoration(
+                    labelText: 'assetId / tag *',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                DropdownButtonFormField<String>(
+                  initialValue: kind,
+                  decoration: const InputDecoration(
+                    labelText: 'condition',
+                    border: OutlineInputBorder(),
+                  ),
+                  items: const [
+                    DropdownMenuItem(
+                        value: 'damaged', child: Text('damaged')),
+                    DropdownMenuItem(
+                        value: 'missing', child: Text('missing')),
+                    DropdownMenuItem(
+                        value: 'needs_repair',
+                        child: Text('needs_repair')),
+                  ],
+                  onChanged: (v) => setD(() => kind = v ?? kind),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: notesCtrl,
+                  maxLines: 3,
+                  decoration: const InputDecoration(
+                    labelText: 'notes',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child:
+                  Text(MaterialLocalizations.of(context).cancelButtonLabel),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Submit'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (ok != true) return;
+    final assetId = assetCtrl.text.trim();
+    if (assetId.isEmpty) return;
+    try {
+      await WorkOrderService().createWorkOrder({
+        'assetId': assetId,
+        'title': 'Condition report: $kind',
+        'priority': 'HIGH',
+        if (notesCtrl.text.trim().isNotEmpty)
+          'description': '[$kind] ${notesCtrl.text.trim()}',
+      });
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Report submitted')),
+      );
+    } catch (e) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(e.toString())));
+    }
   }
 
   Widget _myCondition(BuildContext context, DashboardData d) {
@@ -346,7 +559,7 @@ class _DashboardSectionsState extends State<DashboardSections> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _title(context, 'dueToday',
-            onViewAll: () => _go(const WorkOrdersPage())),
+            onViewAll: () => _go(const WorkOrdersPage(initialStatus: 'due'))),
         Card(
           child: Column(
             children: [
